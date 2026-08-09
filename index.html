@@ -301,6 +301,7 @@
   var testSame = 0;
   var testLast = '';
   var testAt = 0;
+  var awaitChange = false;
 
   function setStatus(text, kind){
     statusText.textContent = text;
@@ -493,6 +494,7 @@
     testSame = 0;
     testLast = '';
     testAt = 0;
+    awaitChange = false;
     btnStartTest.classList.add('hidden');
     btnEndTest.classList.remove('hidden');
     renderTestStat();
@@ -507,6 +509,13 @@
   }
   function autoTestTick(p){
     if (!testActive || !p) return;
+    if (awaitChange){
+      if (p.label === testLast) return;
+      awaitChange = false;
+      testSame = 1;
+      testLast = p.label;
+      return;
+    }
     if (p.label === testLast){
       testSame++;
     } else {
@@ -517,6 +526,7 @@
     if (Date.now() - testAt < 2000) return;
     testAt = Date.now();
     testSame = 0;
+    awaitChange = true;
     var ok = p.label === testTarget;
     state.byLabel[testTarget].total++;
     if (ok) state.byLabel[testTarget].correct++;
@@ -529,7 +539,7 @@
       toast('本轮检验完成！共 ' + testTotal() + ' 次，准确率 ' + pct(testCorrect(), testTotal()) + '%');
     } else {
       testTarget = testTarget === '布' ? '石头' : '布';
-      toast(ok ? '✓ 识别正确！请接着做出「' + testTarget + '」' : '✗ 识别错了：AI 说「' + p.label + '」。请做出「' + testTarget + '」');
+      toast(ok ? '✓ 识别正确！请接着做出「' + testTarget + '」' : '✗ 识别错了（AI 说「' + p.label + '」）。请做出「' + testTarget + '」');
     }
   }
   function snapshot(){
