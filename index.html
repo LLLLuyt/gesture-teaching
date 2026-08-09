@@ -193,7 +193,7 @@
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
     <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时可以让学生重点观察「平均置信度」的提升，或把第 1 轮张数改成 2 张，差距会更明显。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
-    <li>隐藏彩蛋：用两根手指（或两个手指头）捏住屏幕同一点，再向两边拉开——屏幕会撕裂并反转颜色（手机/平板体验最佳，松手自动恢复）。</li>
+    <li>隐藏彩蛋：模型就绪后，用手（拇指和食指）在空中做出"捏住"的动作——捏合处颜色反转；手指张开，屏幕撕裂反转；手放下或离开画面自动恢复。这就是用 AI 手势操控屏幕。</li>
     <li>课前 30 分钟检查清单（防止上课出意外）：① 所有设备打开一次页面并允许摄像头，确认状态栏显示"就绪"；② 每台设备摆个「布」手势，确认骨架贴手；③ 老师演示机用「启动服务器.bat」离线打开，不依赖网络；④ 正式上课前不要再改代码、不要再刷新已备好的页面。</li>
   </ol>
 </details>
@@ -741,6 +741,21 @@
       liveLabel.textContent = '未检测到手';
       liveConf.textContent = '';
     }
+    if (window.__gestureEgg && window.__gestureEgg.update){
+      var gst = null;
+      if (handsList.length > 0){
+        var h0 = handsList[0];
+        var tp = h0[4], idx = h0[8];
+        gst = {
+          x: (1 - (tp.x + idx.x) / 2) * window.innerWidth,
+          y: ((tp.y + idx.y) / 2) * window.innerHeight,
+          dx: (idx.x - tp.x) * window.innerWidth,
+          dy: (idx.y - tp.y) * window.innerHeight,
+          distN: Math.hypot(idx.x - tp.x, idx.y - tp.y)
+        };
+      }
+      window.__gestureEgg.update(gst);
+    }
   }
 
   function restartCamera(){
@@ -919,10 +934,11 @@
   var crackCanvas = document.getElementById('eggCrack');
   if (!invertLayer || !pinchDiv || !crackCanvas) return;
   var cctx = crackCanvas.getContext('2d');
-  var pointers = {};
   var crack = null;
   var noiseSeed = [];
   var fadeRaf = null;
+  var mode = 'idle';
+  var lastDist = -1;
 
   function resize(){
     crackCanvas.width = window.innerWidth;
@@ -931,24 +947,12 @@
   window.addEventListener('resize', resize);
   resize();
 
-  function pts(){
-    var arr = [];
-    for (var k in pointers){
-      if (pointers.hasOwnProperty(k)) arr.push(pointers[k]);
-    }
-    return arr;
-  }
   function crackNoise(i){
     if (!noiseSeed[i]) noiseSeed[i] = Math.random() * 2 - 1;
     return noiseSeed[i];
   }
-  function computeState(list){
-    if (list.length < 2) return { mode: 'idle' };
-    var a = list[0], b = list[1];
-    var dx = b.x - a.x, dy = b.y - a.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    if (dist < 90) return { mode: 'pinch', mx: mx, my: my, dist: dist };
+  function buildCrack(mx, my, dx, dy){
+    var dist = Math.max(Math.hypot(dx, dy), 10);
     var px = -dy / dist, py = dx / dist;
     var len = dist + 120;
     var c = [];
@@ -957,7 +961,7 @@
       var nz = crackNoise(i) * 22 * (1 - Math.abs(u) * 0.35);
       c.push({ x: mx + px * u * len / 2 + py * nz, y: my + py * u * len / 2 - px * nz });
     }
-    return { mode: 'pull', crack: c };
+    return c;
   }
   function drawCrack(c, alpha){
     cctx.clearRect(0, 0, crackCanvas.width, crackCanvas.height);
@@ -980,59 +984,55 @@
     cctx.clearRect(0, 0, crackCanvas.width, crackCanvas.height);
     crack = null;
   }
-  function fadeCrack(){
-    var a = 1;
+  function fadeOut(){
     function step(){
-      a -= 0.12;
-      if (a <= 0.02 || !crack){ clearCrack(); return; }
-      drawCrack(crack, a);
+      invertLayer.style.opacity = String(Math.max(0, parseFloat(invertLayer.style.opacity || '1') - 0.15));
+      if (invertLayer.style.opacity === '0'){
+        invertLayer.classList.remove('show');
+        pinchDiv.style.display = 'none';
+        clearCrack();
+        mode = 'idle';
+        fadeRaf = null;
+        return;
+      }
+      if (crack) drawCrack(crack, parseFloat(invertLayer.style.opacity));
       fadeRaf = requestAnimationFrame(step);
     }
-    fadeRaf = requestAnimationFrame(step);
+    if (!fadeRaf) fadeRaf = requestAnimationFrame(step);
   }
-  function applyState(){
-    var st = computeState(pts());
-    if (st.mode === 'pinch'){
-      var r = 70 + st.dist * 0.6;
+  function update(st){
+    if (!st){
+      if (mode !== 'idle') fadeOut();
+      lastDist = -1;
+      return;
+    }
+    if (mode === 'idle' && st.distN < 0.06){
+      mode = 'pinch';
+    } else if (mode === 'pinch'){
+      if (st.distN > 0.10) mode = 'pull';
+    } else if (mode === 'pull'){
+      if (st.distN < 0.06) mode = 'pinch';
+    }
+    if (mode === 'pinch'){
+      var r = 70 + st.distN * 1200;
       pinchDiv.style.display = 'block';
       pinchDiv.style.width = (r * 2) + 'px';
       pinchDiv.style.height = (r * 2) + 'px';
-      pinchDiv.style.left = (st.mx - r) + 'px';
-      pinchDiv.style.top = (st.my - r) + 'px';
+      pinchDiv.style.left = (st.x - r) + 'px';
+      pinchDiv.style.top = (st.y - r) + 'px';
       invertLayer.classList.remove('show');
+      invertLayer.style.opacity = '1';
       clearCrack();
-    } else if (st.mode === 'pull'){
+    } else if (mode === 'pull'){
       pinchDiv.style.display = 'none';
+      invertLayer.style.opacity = '1';
       invertLayer.classList.add('show');
-      crack = st.crack;
+      crack = buildCrack(st.x, st.y, st.dx, st.dy);
       drawCrack(crack, 1);
-    } else {
-      pinchDiv.style.display = 'none';
-      if (invertLayer.classList.contains('show')){
-        invertLayer.classList.remove('show');
-        if (crack) fadeCrack(); else clearCrack();
-      } else {
-        clearCrack();
-      }
     }
+    lastDist = st.distN;
   }
-  window.addEventListener('pointerdown', function(e){
-    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-    if (pts().length >= 2) document.documentElement.style.touchAction = 'none';
-    applyState();
-  });
-  window.addEventListener('pointermove', function(e){
-    if (!pointers[e.pointerId]) return;
-    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-    applyState();
-  });
-  function up(e){
-    delete pointers[e.pointerId];
-    if (pts().length < 2) document.documentElement.style.touchAction = '';
-    applyState();
-  }
-  window.addEventListener('pointerup', up);
-  window.addEventListener('pointercancel', up);
+  window.__gestureEgg = { update: update };
 })();
 </script>
 </body>
