@@ -13,15 +13,15 @@
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{background:var(--bg); color:var(--ink); font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; padding:18px;}
-  header{max-width:1200px; margin:0 auto 10px;}
-  h1{font-size:19px;}
-  .sub{color:var(--sub); font-size:12px; margin-top:3px; line-height:1.6;}
-  main{max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 460px; gap:16px; align-items:start;}
+  header{max-width:1200px; margin:0 auto 8px;}
+  h1{font-size:17px;}
+  .sub{color:var(--sub); font-size:12px; margin-top:2px; line-height:1.5;}
+  main{max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 460px; gap:14px; align-items:start;}
   .right-panel{align-self:stretch;}
   @media(max-width:900px){ main{grid-template-columns:1fr;} }
-  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
   .cam-card{display:flex; flex-direction:column;}
-  .cam-wrap{position:relative; height:72vh; max-height:640px; min-height:380px;}
+  .cam-wrap{position:relative; height:52vh; max-height:500px; min-height:320px;}
   video{width:100%; height:100%; object-fit:cover; display:block; border-radius:10px; transform:scaleX(-1); background:#0b1020;}
   canvas{position:absolute; inset:0; width:100%; height:100%; border-radius:10px;}
   .cap-guide{position:absolute; left:20%; top:38%; width:60%; height:56%; pointer-events:none; z-index:5;}
@@ -41,7 +41,7 @@
   .status a.link-inline{color:#fff;}
   .round-badge{display:inline-block; background:var(--blue); color:#fff; padding:4px 14px; border-radius:999px; font-size:14px; font-weight:700;}
   .round-badge.r2{background:var(--cyan);}
-  .config{display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; font-size:13px; color:var(--sub); align-items:center;}
+  .config{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0; font-size:13px; color:var(--sub); align-items:center;}
   .config input{width:56px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
   .config input[type=range]{width:90px; padding:0; border:none;}
   #trainModal{position:fixed; inset:0; z-index:1000; background:rgba(13,17,32,.55); display:flex; align-items:center; justify-content:center;}
@@ -51,11 +51,11 @@
   .train-bar{height:18px; background:#eef2f9; border-radius:999px; overflow:hidden;}
   .train-bar i{display:block; height:100%; width:0; background:linear-gradient(90deg, var(--cyan), var(--blue)); border-radius:999px; transition:width .15s;}
   .train-info{font-size:12px; color:var(--sub); margin-top:10px;}
-  .mode-row{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; color:var(--sub); flex-wrap:wrap;}
+  .mode-row{display:flex; align-items:center; gap:8px; margin-top:4px; font-size:13px; color:var(--sub); flex-wrap:wrap;}
   .mode-btn{font-size:13px; padding:6px 12px; background:#eef2f9; color:var(--sub); font-weight:700;}
   .mode-btn.on{background:var(--blue); color:#fff;}
   .mode-tip{font-size:12px; color:var(--sub);}
-  .sec-title{font-size:14px; font-weight:700; margin:10px 0 6px; display:flex; align-items:center; gap:6px;}
+  .sec-title{font-size:14px; font-weight:700; margin:8px 0 4px; display:flex; align-items:center; gap:6px;}
   .sec-title .n{display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--blue); color:#fff; font-size:11px; align-items:center; justify-content:center; flex:none;}
   .collect-row{display:flex; align-items:center; gap:10px;}
   .collect-row + .collect-row{margin-top:6px;}
@@ -71,8 +71,10 @@
   .dots{display:flex; flex-wrap:wrap; gap:4px; min-height:12px; margin-top:4px;}
   .dots .dot{width:9px; height:9px; border-radius:50%; background:#d8e2f4;}
   .dots .dot.on{background:var(--ok);}
-  .gallery-label{font-size:12px; color:var(--sub); margin-top:8px;}
-  .gallery{display:flex; flex-wrap:wrap; gap:4px; height:76px; overflow-y:auto; margin-top:4px; align-content:flex-start;}
+  .galleries{display:flex; gap:10px; margin-top:6px;}
+  .g-col{flex:1; min-width:0;}
+  .gallery-label{font-size:12px; color:var(--sub);}
+  .gallery{display:flex; flex-wrap:wrap; gap:4px; height:66px; overflow-y:auto; margin-top:3px; align-content:flex-start;}
   .gallery:empty::before{content:'（还没有图片）'; font-size:12px; color:var(--sub);}
   .thumb{position:relative; width:56px; height:42px; padding:0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#0b1020; cursor:pointer; transition:border-color .15s;}
   .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
@@ -84,14 +86,15 @@
   .test-hint{font-size:12px; color:var(--amber); margin-top:6px; line-height:1.6;}
   .stat-line b{color:var(--ink);}
   .stat-line .tgt{color:var(--blue); font-size:17px;}
-  .history{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; min-height:20px;}
+  .history{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; height:48px; overflow-y:auto; align-content:flex-start;}
   .chip{width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff;}
   .chip.ok{background:var(--ok);}
   .chip.bad{background:var(--bad);}
   .chip.unk{background:var(--amber);}
-  .round-card{border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-top:6px; font-size:13px; color:var(--sub); background:#f8fbff;}
+  .rounds{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+  .round-card{border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:12px; color:var(--sub); background:#f8fbff;}
   .round-card .acc{color:var(--blue); font-size:18px; font-weight:800; margin-top:2px;}
-  .round-card .extra{font-size:12px; margin-top:2px;}
+  .round-card .extra{font-size:11px; margin-top:2px; line-height:1.5;}
   .hidden{display:none !important;}
   .compare{margin-top:10px;}
   .compare-line{margin-top:8px; font-size:12px; color:var(--sub);}
@@ -163,10 +166,16 @@
       <span class="count" id="cntRock">0 / 4</span>
     </div>
     <div class="dots" id="dotsRock"></div>
-    <div class="gallery-label">已采集图片 · 布（点击缩略图可删除这张）</div>
-    <div class="gallery" id="galleryPaper"></div>
-    <div class="gallery-label">已采集图片 · 石头（点击缩略图可删除这张）</div>
-    <div class="gallery" id="galleryRock"></div>
+    <div class="galleries">
+      <div class="g-col">
+        <div class="gallery-label">已采集图片 · 布（点击缩略图可删除）</div>
+        <div class="gallery" id="galleryPaper"></div>
+      </div>
+      <div class="g-col">
+        <div class="gallery-label">已采集图片 · 石头（点击缩略图可删除）</div>
+        <div class="gallery" id="galleryRock"></div>
+      </div>
+    </div>
 
     <div class="divider"></div>
     <div class="sec-title"><span class="n">2</span>AI 自动检验识别率（AI 自己识别并记录，不用点按钮）</div>
@@ -179,15 +188,17 @@
     <div class="history" id="testHistory"></div>
 
     <div class="sec-title"><span class="n">3</span>两轮结果对比</div>
-    <div class="round-card" id="r1Card">
-      第 1 轮（训练样本 <span id="r1Samples">—</span> 张）
-      <div class="acc" id="r1Acc">—</div>
-      <div class="extra" id="r1Conf"></div>
-    </div>
-    <div class="round-card hidden" id="r2Card">
-      第 2 轮（训练样本 <span id="r2Samples">—</span> 张）
-      <div class="acc" id="r2Acc">—</div>
-      <div class="extra" id="r2Conf"></div>
+    <div class="rounds">
+      <div class="round-card" id="r1Card">
+        第 1 轮（样本 <span id="r1Samples">—</span> 张）
+        <div class="acc" id="r1Acc">—</div>
+        <div class="extra" id="r1Conf"></div>
+      </div>
+      <div class="round-card hidden" id="r2Card">
+        第 2 轮（样本 <span id="r2Samples">—</span> 张）
+        <div class="acc" id="r2Acc">—</div>
+        <div class="extra" id="r2Conf"></div>
+      </div>
     </div>
     <div class="compare" id="compareBox" hidden>
       <div class="bar-row"><span class="bar-name">第 1 轮</span><div class="bar"><i id="bar1"></i></div><span class="bar-num" id="num1"></span></div>
