@@ -184,7 +184,7 @@
   <ol>
     <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定，可离线）；也可以直接双击 index.html 或通过网页链接打开，加载失败时页面会自动切换国内/国际镜像重试。</li>
     <li>第一次打开需要下载约 10MB 模型，慢网络下可能等待 1 分钟（状态栏会显示已等待秒数），这是正常的；建议上课前先每台设备打开一次预热，之后打开就是秒开。</li>
-    <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，画面更顺（关键点略抖，对布/石头识别影响很小）；切换约需 1~2 秒重建模型，采集的数据不受影响。</li>
+    <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，处理分辨率降低（480×360），画面更流畅；不影响识别算法和已采集的数据，切换瞬间完成。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
     <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
@@ -267,21 +267,16 @@
     var m = getMode();
     modeHigh.classList.toggle('on', m === 1);
     modeLite.classList.toggle('on', m === 0);
-    modeTip.textContent = m === 0 ? '轻量：画面更流畅，关键点略抖（平板/老电脑用）' : '高精度：关键点更稳定';
+    modeTip.textContent = m === 0 ? '轻量：用较低分辨率处理，画面更流畅（平板/老电脑用）' : '高精度：分辨率更高，关键点更细';
   }
   function applyMode(m){
     try { localStorage.setItem(MODE_KEY, String(m)); } catch(e){}
     renderModeUI();
-    if (modelReady){
-      modelReady = false;
-      sourceIdx = 0;
-      sourceToken++;
-      clearTimeout(sourceTimer);
-      clearInterval(statusTimer);
-      tryInitSource();
-      toast(m === 0 ? '已切换为轻量模式：画面更流畅（关键点会略抖）' : '已切换为高精度模式');
+    if (videoReady){
+      restartCamera();
+      toast(m === 0 ? '已切换为轻量模式：画面更流畅' : '已切换为高精度模式');
     } else {
-      toast(m === 0 ? '已选择轻量模式（模型加载完成后生效）' : '已选择高精度模式（模型加载完成后生效）');
+      toast(m === 0 ? '已选择轻量模式（摄像头开启后生效）' : '已选择高精度模式（摄像头开启后生效）');
     }
   }
 
@@ -748,11 +743,19 @@
     }
   }
 
+  function restartCamera(){
+    var stream = video.srcObject;
+    if (stream && stream.getTracks){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+    }
+    return initCamera();
+  }
   function initCamera(){
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
       throw new Error('此浏览器不支持摄像头，请使用 Chrome 或 Edge');
     }
-    return navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false })
+    var size = getMode() === 0 ? { width: 480, height: 360 } : { width: 640, height: 480 };
+    return navigator.mediaDevices.getUserMedia({ video: { width: size.width, height: size.height, facingMode: 'user' }, audio: false })
       .then(function(stream){
         video.srcObject = stream;
         video.muted = true;
@@ -845,7 +848,7 @@
       if (el >= 3) setStatus('正在加载手势模型（来源 ' + n + '/' + sources.length + '：' + name + '，约 10MB，已等待 ' + el + ' 秒）…');
     }, 3000);
     hands = new Hands({ locateFile: function(file){ return base + '/' + file; } });
-    hands.setOptions({ maxNumHands: 4, modelComplexity: getMode(), minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+    hands.setOptions({ maxNumHands: 4, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
     hands.onResults(onResults);
     sourceTimer = setTimeout(function(){
       if (token !== sourceToken) return;
