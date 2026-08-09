@@ -800,11 +800,29 @@
     setStatus('正在加载模型脚本…');
     setTimeout(function(){ waitForHands(attempt + 1); }, 800);
   }
+  function cameraErrorText(e){
+    var name = e && e.name ? String(e.name) : '';
+    var m = e && e.message ? e.message : String(e);
+    var s = name + ' ' + m;
+    if (/NotAllowedError|PermissionDenied|not allowed|permission denied/i.test(s)){
+      return '权限被拒绝：请点击浏览器地址栏的摄像头图标允许访问；若仍不行，检查 Windows 设置 → 隐私和安全性 → 相机 → 打开"允许桌面应用访问你的相机"（Edge/Chrome 都属于桌面应用）';
+    }
+    if (/NotFoundError|DevicesNotFound|not found/i.test(s)){
+      return '没有检测到摄像头：请检查摄像头是否已连接、驱动是否正常、有没有被禁用';
+    }
+    if (/NotReadableError|TrackStart|video source/i.test(s)){
+      return '摄像头被其他软件占用：请关闭微信/钉钉/腾讯会议等正在用摄像头的程序，然后刷新重试';
+    }
+    if (/Overconstrained|Constraints could not be satisfied/i.test(s)){
+      return '摄像头不支持当前分辨率：请点右侧「轻量（流畅）」模式后再试';
+    }
+    return m;
+  }
   function boot(){
     initCamera().then(function(){
       setStatus('摄像头已开启，正在加载手势模型…');
     }).catch(function(e){
-      setStatus('摄像头无法开启：' + (e && e.message ? e.message : e) + '（模型仍会继续加载）', 'error');
+      setStatus('摄像头无法开启：' + cameraErrorText(e) + '（模型仍会继续加载）', 'error');
     });
     waitForHands(0);
   }
