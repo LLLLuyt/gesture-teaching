@@ -167,7 +167,7 @@
 <details>
   <summary>使用说明与教学建议</summary>
   <ol>
-    <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定，可离线）；也可以直接双击 index.html，加载失败时页面会自动改用联网模式重试。</li>
+    <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定，可离线）；也可以直接双击 index.html 或通过网页链接打开，加载失败时页面会自动切换国内/国际镜像重试。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
     <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
@@ -677,6 +677,7 @@
   }
   var hands = null;
   var modelReady = false;
+  var sourceToken = 0;
   var sources = [];
   if (!FORCE_CDN) sources.push('mediapipe');
   sources.push('https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240');
@@ -694,24 +695,55 @@
     setStatus(msg, 'error');
     showRetryHelp();
   }
-  function tryInitSource(){
-    if (!window.Hands){
+  function waitForHands(attempt){
+    if (window.Hands){
+      tryInitSource();
+      return;
+    }
+    if (attempt >= 25){
       setStatus('模型脚本加载失败：请检查网络后刷新重试', 'error');
       showRetryHelp();
       return;
     }
+    setStatus('正在加载模型脚本…');
+    setTimeout(function(){ waitForHands(attempt + 1); }, 800);
+  }
+  function boot(){
+    initCamera().then(function(){
+      setStatus('摄像头已开启，正在加载手势模型…');
+    }).catch(function(e){
+      setStatus('摄像头无法开启：' + (e && e.message ? e.message : e) + '（模型仍会继续加载）', 'error');
+    });
+    waitForHands(0);
+  }
+  function whenCamera(attempt){
+    if (videoReady){
+      setStatus('就绪：请把手放到摄像头前', 'ready');
+      requestAnimationFrame(loop);
+      return;
+    }
+    if (attempt >= 5){
+      setStatus('模型已就绪，但摄像头未开启：请允许摄像头权限后刷新重试', 'error');
+      showRetryHelp();
+      return;
+    }
+    setTimeout(function(){ whenCamera(attempt + 1); }, 1000);
+  }
+  function tryInitSource(){
     if (sourceIdx >= sources.length){
       finalFail('模型加载失败：所有来源都无法访问。请刷新页面重试，或更换网络后再试');
       return;
     }
     var base = sources[sourceIdx];
+    var token = ++sourceToken;
     var n = sourceIdx + 1;
     var name = sourceName(base);
-    setStatus('正在加载手势模型（来源 ' + n + '/' + sources.length + '：' + name + '，约 10MB，首次加载较慢）…');
+    setStatus('正在加载手势模型（来源 ' + n + '/' + sources.length + '：' + name + '，约 10MB）…');
     hands = new Hands({ locateFile: function(file){ return base + '/' + file; } });
     hands.setOptions({ maxNumHands: 4, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
     hands.onResults(onResults);
     sourceTimer = setTimeout(function(){
+      if (token !== sourceToken) return;
       sourceIdx++;
       if (sourceIdx >= sources.length){
         finalFail('模型加载失败：所有来源下载都超时。请刷新页面重试，或更换网络后再试');
@@ -721,25 +753,18 @@
       }
     }, base === 'mediapipe' ? 10000 : 20000);
     hands.initialize().then(function(){
+      if (token !== sourceToken) return;
       clearTimeout(sourceTimer);
       modelReady = true;
-      setStatus('手势模型已就绪，正在开启摄像头…');
-      return initCamera();
-    }).then(function(){
-      setStatus('就绪：请把手放到摄像头前', 'ready');
-      requestAnimationFrame(loop);
+      whenCamera(0);
     }).catch(function(e){
+      if (token !== sourceToken) return;
       clearTimeout(sourceTimer);
-      if (!modelReady){
-        sourceIdx++;
-        if (sourceIdx >= sources.length){
-          finalFail('模型加载失败：' + (e && e.message ? e.message : e));
-        } else {
-          tryInitSource();
-        }
+      sourceIdx++;
+      if (sourceIdx >= sources.length){
+        finalFail('模型加载失败：' + (e && e.message ? e.message : e));
       } else {
-        setStatus('模型已就绪，但摄像头无法开启：' + (e && e.message ? e.message : e) + '。请允许摄像头权限后点重试', 'error');
-        showRetryHelp();
+        tryInitSource();
       }
     });
   }
@@ -769,7 +794,7 @@
   var restored = restore();
   renderAll();
   if (restored) toast('已恢复上次的实验数据（检验历史记录不保留）');
-  tryInitSource();
+  boot();
 })();
 </script>
 </body>
