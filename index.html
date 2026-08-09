@@ -475,8 +475,9 @@
   }
   function handInBox(lm){
     var cx = 0, cy = 0;
-    for (var i = 0; i < 21; i++){ cx += lm[i].x; cy += lm[i].y; }
-    cx /= 21; cy /= 21;
+    var PALM = [0, 5, 9, 13, 17];
+    for (var i = 0; i < PALM.length; i++){ cx += lm[PALM[i]].x; cy += lm[PALM[i]].y; }
+    cx /= PALM.length; cy /= PALM.length;
     return cx >= CAPTURE_BOX.xPct && cx <= CAPTURE_BOX.xPct + CAPTURE_BOX.wPct &&
            cy >= CAPTURE_BOX.yPct && cy <= CAPTURE_BOX.yPct + CAPTURE_BOX.hPct;
   }
@@ -507,6 +508,11 @@
         reject(new Error('TF.js 未加载，使用备用识别'));
         return;
       }
+      var webglOk = true;
+      try {
+        if (!document.createElement('canvas').getContext('webgl')) webglOk = false;
+      } catch(e){ webglOk = false; }
+      try { tf.setBackend(webglOk ? 'webgl' : 'cpu'); } catch(e){}
       var xs = [], ys = [];
       LABELS.forEach(function(label, li){
         state.samples[label].forEach(function(s){
@@ -1002,6 +1008,8 @@
     ctx.textBaseline = 'middle';
     ctx.fillText(text, px, py - 5);
   }
+  var lastNnAt = 0;
+  var nnCache = null;
   function onResults(results){
     var handsList = results.multiHandLandmarks || [];
     handCount = handsList.length;
@@ -1017,11 +1025,24 @@
     ctx.clearRect(0, 0, bw, bh);
     if (handCount > 0){
       var labels = [];
+      var p0 = null;
+      if (totalSamples() > 0){
+        if (nnModel && tfReady()){
+          var now = Date.now();
+          if (now - lastNnAt > 200 || !nnCache){
+            nnCache = predictCurrent(handsList[0]);
+            lastNnAt = now;
+          }
+          p0 = nnCache;
+        } else {
+          p0 = predict(extractFeatures(handsList[0]));
+        }
+      }
       for (var i = 0; i < handsList.length; i++){
         var color = HAND_COLORS[i % HAND_COLORS.length];
         drawSkeleton(handsList[i], color, bw, bh, scale, offX, offY);
         if (totalSamples() > 0){
-          var p = predictCurrent(handsList[i]);
+          var p = i === 0 ? p0 : predict(extractFeatures(handsList[i]));
           var labelText = p.unknown ? 'AI还不认识' : p.label + ' ' + Math.round(p.conf * 100) + '%';
           drawHandLabel(handsList[i], labelText, color, bw, bh, scale, offX, offY);
           labels.push('手' + (i + 1) + ' ' + labelText);
@@ -1035,7 +1056,7 @@
         liveConf.textContent = '（先采集图片）';
       }
       if (handsList.length > 0 && totalSamples() > 0){
-        autoTestTick(predictCurrent(handsList[0]));
+        autoTestTick(p0);
       }
     } else {
       liveLabel.textContent = '未检测到手';
@@ -1043,7 +1064,14 @@
     }
   }
   function predictCurrent(lm){
-    return (nnModel && tfReady()) ? predictNN(extractPixelFeat()) : predict(extractFeatures(lm));
+    if (nnModel && tfReady()){
+      try {
+        return predictNN(extractPixelFeat());
+      } catch(e){
+        // NN 异常时退回 KNN，保证界面不中断
+      }
+    }
+    return predict(extractFeatures(lm));
   }
 
   function restartCamera(){
