@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>布 vs 石头 · 手势识别训练实验</title>
+<style>
+  :root{
+    --bg:#eef4ff; --card:#ffffff; --line:#dbe5f5;
+    --ink:#1d2b4f; --sub:#5b6b8c;
+    --blue:#2f6bff; --blue-dark:#1f4fd6; --cyan:#00c2ff;
+    --ok:#22c55e; --bad:#ef4444; --amber:#f59e0b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; padding:18px;}
+  header{max-width:1080px; margin:0 auto 14px;}
+  h1{font-size:22px;}
+  .sub{color:var(--sub); font-size:13px; margin-top:4px; line-height:1.7;}
+  main{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:1fr 400px; gap:16px; align-items:start;}
+  @media(max-width:900px){ main{grid-template-columns:1fr;} }
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
+  .cam-wrap{position:relative;}
+  video{width:100%; display:block; border-radius:10px; transform:scaleX(-1); background:#0b1020;}
+  canvas{position:absolute; inset:0; width:100%; height:100%; border-radius:10px;}
+  .live{display:flex; align-items:baseline; gap:10px; margin-top:10px; font-size:15px; flex-wrap:wrap;}
+  #liveLabel{font-size:20px; font-weight:700; color:var(--blue);}
+  #liveConf{color:var(--sub); font-size:13px;}
+  .status{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--sub); margin-top:8px;}
+  .status .dot-pulse{width:8px; height:8px; border-radius:50%; background:var(--amber);}
+  .status.ready .dot-pulse{background:var(--ok);}
+  .status.error{color:var(--bad);}
+  .round-badge{display:inline-block; background:var(--blue); color:#fff; padding:4px 14px; border-radius:999px; font-size:14px; font-weight:700;}
+  .round-badge.r2{background:var(--cyan);}
+  .config{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; font-size:13px; color:var(--sub); align-items:center;}
+  .config input{width:56px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
+  .sec-title{font-size:14px; font-weight:700; margin:14px 0 8px; display:flex; align-items:center; gap:6px;}
+  .sec-title .n{display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--blue); color:#fff; font-size:11px; align-items:center; justify-content:center; flex:none;}
+  .collect-row{display:flex; align-items:center; gap:10px;}
+  .collect-row + .collect-row{margin-top:8px;}
+  button{font-family:inherit; font-size:16px; font-weight:700; padding:10px 16px; border:none; border-radius:10px; cursor:pointer; transition:transform .06s, opacity .15s;}
+  button:active{transform:scale(.97);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  .btn-paper{background:#dbeafe; color:var(--blue-dark);}
+  .btn-rock{background:#fde8e8; color:#b91c1c;}
+  .btn-act{background:var(--blue); color:#fff;}
+  .btn-ghost{background:#eef2f9; color:var(--sub); font-size:14px;}
+  .btn-ghost:hover{background:#e2e9f6;}
+  .count{font-size:14px; font-weight:700; min-width:74px;}
+  .dots{display:flex; flex-wrap:wrap; gap:4px; min-height:14px; margin-top:6px;}
+  .dots .dot{width:9px; height:9px; border-radius:50%; background:#d8e2f4;}
+  .dots .dot.on{background:var(--ok);}
+  .divider{border-top:1px dashed var(--line); margin:14px 0;}
+  .test-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .stat-line{font-size:13px; color:var(--sub); margin-top:10px; line-height:1.7;}
+  .stat-line b{color:var(--ink);}
+  .history{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:22px;}
+  .chip{width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff;}
+  .chip.ok{background:var(--ok);}
+  .chip.bad{background:var(--bad);}
+  .round-card{border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:8px; font-size:13px; color:var(--sub); background:#f8fbff;}
+  .round-card .acc{color:var(--blue); font-size:22px; font-weight:800; margin-top:2px;}
+  .round-card .extra{font-size:12px; margin-top:2px;}
+  .hidden{display:none !important;}
+  .compare{margin-top:10px;}
+  .bar-row{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--sub);}
+  .bar-row .bar-name{width:92px; flex:none; text-align:right;}
+  .bar{flex:1; height:16px; background:#e6edfa; border-radius:8px; overflow:hidden;}
+  .bar i{display:block; height:100%; min-width:2px; background:linear-gradient(90deg,var(--cyan),var(--blue)); border-radius:8px;}
+  .bar-row .bar-num{width:44px; flex:none; font-weight:700; color:var(--ink);}
+  .conclusion{margin-top:10px; padding:10px 12px; border-radius:10px; background:#ecfdf3; border:1px solid #b9f2cd; font-size:14px; font-weight:700; color:#15803d; display:none;}
+  .actions{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  #toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:#1d2b4f; color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:99; max-width:80vw;}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  details{margin:16px auto 30px; max-width:1080px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+  summary{cursor:pointer; font-weight:700; font-size:14px;}
+  details ol, details ul{padding-left:22px; margin-top:8px; font-size:13px; color:var(--sub); line-height:1.9;}
+</style>
+</head>
+<body>
+<header>
+  <h1>布 vs 石头 · 手势识别训练实验</h1>
+  <p class="sub">小学人工智能通识课 · 用摄像头采集图片，训练一个属于同学们自己的「AI 模型」，看看训练数据越多，识别越准吗？摄像头画面只在电脑本地处理，不会上传网络。</p>
+</header>
+
+<main>
+  <section class="card">
+    <div class="cam-wrap">
+      <video id="video" width="640" height="480" autoplay playsinline></video>
+      <canvas id="canvas" width="640" height="480"></canvas>
+    </div>
+    <div class="live">
+      <span>实时识别：</span>
+      <span id="liveLabel">等待摄像头…</span>
+      <span id="liveConf"></span>
+    </div>
+    <div class="status" id="statusBar"><span class="dot-pulse"></span><span id="statusText">正在加载手势模型…</span></div>
+    <p class="stat-line" id="trainInfo">训练集：还没有图片</p>
+  </section>
+
+  <section class="card">
+    <span class="round-badge" id="roundBadge">第 1 轮 · 每类 4 张</span>
+    <div class="config">
+      第 1 轮每类
+      <input id="inT1" type="number" min="2" max="20" value="4"> 张
+      　第 2 轮每类
+      <input id="inT2" type="number" min="4" max="50" value="20"> 张
+    </div>
+
+    <div class="sec-title"><span class="n">1</span>采集训练图片（把手掌放到镜头前，等出现骨架关键点再拍）</div>
+    <div class="collect-row">
+      <button class="btn-paper" id="btnCollectPaper">采集「布」</button>
+      <span class="count" id="cntPaper">0 / 4</span>
+    </div>
+    <div class="dots" id="dotsPaper"></div>
+    <div class="collect-row">
+      <button class="btn-rock" id="btnCollectRock">采集「石头」</button>
+      <span class="count" id="cntRock">0 / 4</span>
+    </div>
+    <div class="dots" id="dotsRock"></div>
+
+    <div class="divider"></div>
+    <div class="sec-title"><span class="n">2</span>检验识别率（同学摆手势，老师按实际手势点按钮，AI 来猜）</div>
+    <div class="test-row">
+      <button class="btn-paper" id="btnTestPaper" disabled>检验「布」</button>
+      <button class="btn-rock" id="btnTestRock" disabled>检验「石头」</button>
+    </div>
+    <div class="stat-line" id="testStat">先完成采集（两类都达到目标张数）才能检验</div>
+    <div class="history" id="testHistory"></div>
+
+    <div class="sec-title"><span class="n">3</span>两轮结果对比</div>
+    <div class="round-card" id="r1Card">
+      第 1 轮（训练样本 <span id="r1Samples">—</span> 张）
+      <div class="acc" id="r1Acc">—</div>
+      <div class="extra" id="r1Conf"></div>
+    </div>
+    <div class="round-card hidden" id="r2Card">
+      第 2 轮（训练样本 <span id="r2Samples">—</span> 张）
+      <div class="acc" id="r2Acc">—</div>
+      <div class="extra" id="r2Conf"></div>
+    </div>
+    <div class="compare" id="compareBox" hidden>
+      <div class="bar-row"><span class="bar-name">第 1 轮</span><div class="bar"><i id="bar1"></i></div><span class="bar-num" id="num1"></span></div>
+      <div class="bar-row"><span class="bar-name">第 2 轮</span><div class="bar"><i id="bar2"></i></div><span class="bar-num" id="num2"></span></div>
+    </div>
+    <div class="conclusion" id="conclusion">实验完成：训练图片越多，识别准确率越高！</div>
+
+    <div class="actions">
+      <button class="btn-act" id="btnNextRound" disabled>完成第1轮检验，进入第2轮</button>
+      <button class="btn-ghost" id="btnReset">重新开始</button>
+    </div>
+  </section>
+</main>
+
+<details>
+  <summary>使用说明与教学建议</summary>
+  <ol>
+    <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定）；也可以直接双击 index.html，但那样需要电脑能联网加载模型。</li>
+    <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。</li>
+    <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
+    <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
+    <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
+    <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时可以让学生重点观察「平均置信度」的提升，或把第 1 轮张数改成 2 张，差距会更明显。</li>
+    <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
+  </ol>
+</details>
+
+<div id="toast"></div>
+
+<script>
+  var FORCE_CDN = location.search.indexOf('cdn=1') >= 0;
+  var CDN_BASE = 'mediapipe';
+  var FALLBACKS = [
+    'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240',
+    'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240',
+    'https://unpkg.com/@mediapipe/hands@0.4.1675469240'
+  ];
+  function onLocalHandsFail(){
+    if (FORCE_CDN || window.Hands) return;
+    loadCdn(0);
+  }
+  function loadCdn(i){
+    if (i >= FALLBACKS.length){
+      var t = document.getElementById('statusText');
+      if (t) t.textContent = '模型文件加载失败：请检查网络，或双击「启动服务器.bat」';
+      return;
+    }
+    CDN_BASE = FALLBACKS[i];
+    var s = document.createElement('script');
+    s.src = FALLBACKS[i] + '/hands.js';
+    s.onerror = function(){ loadCdn(i + 1); };
+    document.head.appendChild(s);
+  }
+  if (FORCE_CDN){
+    CDN_BASE = FALLBACKS[0];
+    document.write('<script src="' + CDN_BASE + '/hands.js"><\/script>');
+  }
+</script>
+<script src="mediapipe/hands.js" onerror="onLocalHandsFail()"></script>
+<script>
+(function(){
+  'use strict';
+  var LABELS = ['布', '石头'];
+  var W = 640, H = 480;
+  var CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+  function $(id){ return document.getElementById(id); }
+  var video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
+  var liveLabel = $('liveLabel'), liveConf = $('liveConf');
+  var statusBar = $('statusBar'), statusText = $('statusText');
+  var trainInfo = $('trainInfo');
+  var roundBadge = $('roundBadge');
+  var cntPaper = $('cntPaper'), cntRock = $('cntRock');
+  var dotsPaper = $('dotsPaper'), dotsRock = $('dotsRock');
+  var btnCollectPaper = $('btnCollectPaper'), btnCollectRock = $('btnCollectRock');
+  var btnTestPaper = $('btnTestPaper'), btnTestRock = $('btnTestRock');
+  var testStat = $('testStat'), testHistory = $('testHistory');
+  var r1Card = $('r1Card'), r1Samples = $('r1Samples'), r1Acc = $('r1Acc'), r1Conf = $('r1Conf');
+  var r2Card = $('r2Card'), r2Samples = $('r2Samples'), r2Acc = $('r2Acc'), r2Conf = $('r2Conf');
+  var compareBox = $('compareBox'), bar1 = $('bar1'), bar2 = $('bar2'), num1 = $('num1'), num2 = $('num2');
+  var conclusion = $('conclusion');
+  var btnNextRound = $('btnNextRound'), btnReset = $('btnReset');
+  var inT1 = $('inT1'), inT2 = $('inT2');
+  var toastEl = $('toast');
+
+  var state = {
+    round: 1,
+    samples: { '布': [], '石头': [] },
+    tests: { correct: 0, total: 0 },
+    confSum: 0,
+    r1: null,
+    r2: null
+  };
+  function t1(){ return Math.max(2, parseInt(inT1.value, 10) || 4); }
+  function t2(){ return Math.max(4, parseInt(inT2.value, 10) || 20); }
+  function targets(){ return { '布': state.round === 1 ? t1() : t2(), '石头': state.round === 1 ? t1() : t2() }; }
+
+  var lastLandmarks = null;
+  var handPresent = false;
+  var videoReady = false;
+  var lastCollectAt = 0;
+  var toastTimer = null;
+
+  function setStatus(text, kind){
+    statusText.textContent = text;
+    statusBar.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2400);
+  }
+  function pct(c, t){ return t ? Math.round(c / t * 100) : 0; }
+  function totalSamples(){ return state.samples['布'].length + state.samples['石头'].length; }
+  function targetsDone(){
+    return state.samples['布'].length >= targets()['布'] && state.samples['石头'].length >= targets()['石头'];
+  }
+
+  function dist(a, b){
+    var s = 0;
+    for (var i = 0; i < a.length; i++) s += (a[i] - b[i]) * (a[i] - b[i]);
+    return Math.sqrt(s);
+  }
+  function extractFeatures(lm){
+    var wrist = lm[0], mcp = lm[9];
+    var scale = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y) || 1;
+    var f = [];
+    for (var i = 0; i < 21; i++) f.push((lm[i].x - wrist.x) / scale, (lm[i].y - wrist.y) / scale);
+    return f;
+  }
+  function predict(feats){
+    var rows = [];
+    LABELS.forEach(function(label){
+      state.samples[label].forEach(function(f){ rows.push({ label: label, d: dist(f, feats) }); });
+    });
+    if (!rows.length) return null;
+    rows.sort(function(a, b){ return a.d - b.d; });
+    var k = Math.min(3, rows.length);
+    var votes = { '布': 0, '石头': 0 };
+    for (var i = 0; i < k; i++) votes[rows[i].label]++;
+    var label = votes['布'] >= votes['石头'] ? '布' : '石头';
+    if (votes['布'] === votes['石头']) label = rows[0].label;
+    return { label: label, conf: Math.max(votes['布'], votes['石头']) / k };
+  }
+
+  function renderDots(el, label, target){
+    el.innerHTML = '';
+    var n = state.samples[label].length;
+    var max = Math.max(target, n);
+    for (var i = 0; i < max; i++){
+      var d = document.createElement('span');
+      d.className = 'dot' + (i < n ? ' on' : '');
+      el.appendChild(d);
+    }
+  }
+  function renderCounts(){
+    var tg = targets();
+    cntPaper.textContent = state.samples['布'].length + ' / ' + tg['布'];
+    cntRock.textContent = state.samples['石头'].length + ' / ' + tg['石头'];
+    renderDots(dotsPaper, '布', tg['布']);
+    renderDots(dotsRock, '石头', tg['石头']);
+    var done = targetsDone();
+    btnTestPaper.disabled = !done;
+    btnTestRock.disabled = !done;
+    btnNextRound.disabled = state.r2 !== null || !(done && state.tests.total > 0);
+    trainInfo.textContent = '训练集：布 ' + state.samples['布'].length + ' 张 + 石头 ' + state.samples['石头'].length + ' 张 = ' + totalSamples() + ' 张（每次识别都用全部样本投票）';
+  }
+  function renderTestStat(){
+    var t = state.tests.total;
+    if (!t){
+      testStat.textContent = '第 ' + state.round + ' 轮：还没有检验记录';
+      return;
+    }
+    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + state.tests.correct + '</b> 次，准确率 <b>' + pct(state.tests.correct, t) + '%</b>（平均置信度 ' + Math.round(state.confSum / t * 100) + '%）';
+  }
+  function addHistory(ok){
+    var c = document.createElement('span');
+    c.className = 'chip ' + (ok ? 'ok' : 'bad');
+    c.textContent = ok ? '✓' : '✗';
+    testHistory.appendChild(c);
+    while (testHistory.children.length > 24) testHistory.removeChild(testHistory.firstChild);
+  }
+  function renderRoundCard(elS, elA, elC, d){
+    elS.textContent = d.samples;
+    elA.textContent = pct(d.correct, d.total) + '%';
+    elC.textContent = '平均置信度 ' + Math.round(d.confAvg * 100) + '%' + (d.correct === d.total ? '（全对）' : '');
+  }
+  function renderCompare(){
+    compareBox.hidden = false;
+    var a1 = pct(state.r1.correct, state.r1.total);
+    var a2 = pct(state.r2.correct, state.r2.total);
+    bar1.style.width = a1 + '%';
+    bar2.style.width = a2 + '%';
+    num1.textContent = a1 + '%';
+    num2.textContent = a2 + '%';
+  }
+
+  function doCollect(label){
+    if (!handPresent || !lastLandmarks){
+      toast('没看到手：请把手掌放到镜头前，等骨架关键点出现');
+      return;
+    }
+    var now = Date.now();
+    if (now - lastCollectAt < 300) return;
+    lastCollectAt = now;
+    if (state.samples[label].length >= 60){
+      toast('「' + label + '」已经够多了，每类最多 60 张');
+      return;
+    }
+    state.samples[label].push(extractFeatures(lastLandmarks));
+    renderCounts();
+    var n = state.samples[label].length, tg = targets()[label];
+    if (targetsDone()){
+      toast('两类都采满了！点击下方按钮开始检验');
+    } else if (n >= tg){
+      toast('「' + label + '」已采满 ' + n + ' 张！');
+    } else {
+      toast('已采集「' + label + '」第 ' + n + ' 张（目标 ' + tg + ' 张）');
+    }
+  }
+  function doTest(label){
+    if (!handPresent || !lastLandmarks){
+      toast('没看到手：请把手掌放到摄像头前，等骨架出现');
+      return;
+    }
+    var p = predict(extractFeatures(lastLandmarks));
+    if (!p){
+      toast('训练集还没有数据，请先采集图片');
+      return;
+    }
+    var ok = p.label === label;
+    state.tests.total++;
+    if (ok) state.tests.correct++;
+    state.confSum += p.conf;
+    addHistory(ok);
+    renderTestStat();
+    renderCounts();
+    if (ok){
+      toast('✓ 识别正确！AI 说「' + p.label + '」，置信度 ' + Math.round(p.conf * 100) + '%');
+    } else {
+      toast('✗ 识别错了：AI 说「' + p.label + '」，实际是「' + label + '」');
+    }
+  }
+  function nextRound(){
+    var t = state.tests;
+    if (state.r1 === null){
+      state.r1 = { correct: t.correct, total: t.total, samples: totalSamples(), confAvg: t.total ? state.confSum / t.total : 0 };
+      renderRoundCard(r1Samples, r1Acc, r1Conf, state.r1);
+      state.round = 2;
+      t.correct = 0; t.total = 0;
+      state.confSum = 0;
+      testHistory.innerHTML = '';
+      r2Card.classList.remove('hidden');
+      roundBadge.classList.add('r2');
+      roundBadge.textContent = '第 2 轮 · 每类 ' + t2() + ' 张';
+      btnNextRound.textContent = '完成第2轮检验，查看对比结果';
+      renderCounts();
+      renderTestStat();
+      toast('第 2 轮开始！给「布」和「石头」各增加采集到 ' + t2() + ' 张，再用刚才那位同学检验');
+    } else if (state.r2 === null){
+      state.r2 = { correct: t.correct, total: t.total, samples: totalSamples(), confAvg: t.total ? state.confSum / t.total : 0 };
+      renderRoundCard(r2Samples, r2Acc, r2Conf, state.r2);
+      renderCompare();
+      btnNextRound.disabled = true;
+      btnNextRound.textContent = '实验完成';
+      conclusion.style.display = 'block';
+      toast('实验完成！样本 ' + state.r1.samples + ' 张 → ' + state.r2.samples + ' 张，准确率 ' + pct(state.r1.correct, state.r1.total) + '% → ' + pct(state.r2.correct, state.r2.total) + '%');
+      conclusion.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+  function resetAll(){
+    if (!confirm('确定清空所有数据，重新开始吗？')) return;
+    state.round = 1;
+    state.samples = { '布': [], '石头': [] };
+    state.tests = { correct: 0, total: 0 };
+    state.confSum = 0;
+    state.r1 = state.r2 = null;
+    testHistory.innerHTML = '';
+    r2Card.classList.add('hidden');
+    compareBox.hidden = true;
+    conclusion.style.display = 'none';
+    roundBadge.classList.remove('r2');
+    roundBadge.textContent = '第 1 轮 · 每类 ' + t1() + ' 张';
+    btnNextRound.textContent = '完成第1轮检验，进入第2轮';
+    renderCounts();
+    renderTestStat();
+    toast('已重新开始');
+  }
+
+  function drawSkeleton(lm){
+    ctx.save();
+    ctx.translate(W, 0);
+    ctx.scale(-1, 1);
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    CONNECTIONS.forEach(function(c){
+      ctx.strokeStyle = '#00c2ff';
+      ctx.beginPath();
+      ctx.moveTo(lm[c[0]].x * W, lm[c[0]].y * H);
+      ctx.lineTo(lm[c[1]].x * W, lm[c[1]].y * H);
+      ctx.stroke();
+    });
+    ctx.fillStyle = '#ff4757';
+    lm.forEach(function(p){
+      ctx.beginPath();
+      ctx.arc(p.x * W, p.y * H, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+  function onResults(results){
+    var lm = results.multiHandLandmarks && results.multiHandLandmarks[0];
+    lastLandmarks = lm || null;
+    handPresent = !!lm;
+    ctx.clearRect(0, 0, W, H);
+    if (lm){
+      drawSkeleton(lm);
+      if (totalSamples() > 0){
+        var p = predict(extractFeatures(lm));
+        liveLabel.textContent = p.label;
+        liveConf.textContent = '置信度 ' + Math.round(p.conf * 100) + '%';
+      } else {
+        liveLabel.textContent = '待训练';
+        liveConf.textContent = '（先采集图片）';
+      }
+    } else {
+      liveLabel.textContent = '未检测到手';
+      liveConf.textContent = '';
+    }
+  }
+
+  function initCamera(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      throw new Error('此浏览器不支持摄像头，请使用 Chrome 或 Edge');
+    }
+    return navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false })
+      .then(function(stream){
+        video.srcObject = stream;
+        video.muted = true;
+        return video.play();
+      })
+      .then(function(){ videoReady = true; });
+  }
+  var hands = null;
+  function initHands(){
+    hands = new Hands({ locateFile: function(file){ return CDN_BASE + '/' + file; } });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+    hands.onResults(onResults);
+    var timer = setTimeout(function(){
+      if (!videoReady){
+        setStatus('模型加载超时', 'error');
+        if (!FORCE_CDN && location.protocol === 'file:'){
+          statusText.innerHTML = '直接打开文件加载失败，<a href="?cdn=1" style="color:#fff">点这里改用联网模式</a>，或双击「启动服务器.bat」';
+        }
+      }
+    }, 20000);
+    hands.initialize().then(function(){
+      clearTimeout(timer);
+      setStatus('手势模型已就绪，正在开启摄像头…');
+      return initCamera();
+    }).then(function(){
+      setStatus('就绪：请把手放到摄像头前', 'ready');
+      requestAnimationFrame(loop);
+    }).catch(function(e){
+      setStatus('初始化失败：' + (e && e.message ? e.message : e), 'error');
+    });
+  }
+  function loop(){
+    if (videoReady && video.readyState >= 2){
+      hands.send({ image: video }).catch(function(){});
+    }
+    requestAnimationFrame(loop);
+  }
+
+  btnCollectPaper.addEventListener('click', function(){ doCollect('布'); });
+  btnCollectRock.addEventListener('click', function(){ doCollect('石头'); });
+  btnTestPaper.addEventListener('click', function(){ doTest('布'); });
+  btnTestRock.addEventListener('click', function(){ doTest('石头'); });
+  btnNextRound.addEventListener('click', nextRound);
+  btnReset.addEventListener('click', resetAll);
+  inT1.addEventListener('change', function(){
+    roundBadge.textContent = '第 1 轮 · 每类 ' + t1() + ' 张';
+    renderCounts();
+  });
+  inT2.addEventListener('change', function(){
+    if (state.round === 2) roundBadge.textContent = '第 2 轮 · 每类 ' + t2() + ' 张';
+    renderCounts();
+  });
+
+  renderCounts();
+  renderTestStat();
+  initHands();
+})();
+</script>
+</body>
+</html>
