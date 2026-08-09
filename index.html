@@ -159,6 +159,7 @@
     <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
+    <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
     <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时可以让学生重点观察「平均置信度」的提升，或把第 1 轮张数改成 2 张，差距会更明显。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
   </ol>
@@ -202,6 +203,7 @@
   var LABELS = ['布', '石头'];
   var W = 640, H = 480;
   var CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  var HAND_COLORS = ['#00c2ff', '#22c55e', '#f59e0b', '#a855f7'];
 
   function $(id){ return document.getElementById(id); }
   var video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
@@ -235,7 +237,7 @@
   function targets(){ return { '布': state.round === 1 ? t1() : t2(), '石头': state.round === 1 ? t1() : t2() }; }
 
   var lastLandmarks = null;
-  var handPresent = false;
+  var handCount = 0;
   var videoReady = false;
   var lastCollectAt = 0;
   var toastTimer = null;
@@ -336,8 +338,12 @@
   }
 
   function doCollect(label){
-    if (!handPresent || !lastLandmarks){
+    if (handCount === 0 || !lastLandmarks){
       toast('没看到手：请把手掌放到镜头前，等骨架关键点出现');
+      return;
+    }
+    if (handCount > 1){
+      toast('同框有 ' + handCount + ' 只手：采集时请一次只伸一只手');
       return;
     }
     var now = Date.now();
@@ -359,8 +365,12 @@
     }
   }
   function doTest(label){
-    if (!handPresent || !lastLandmarks){
+    if (handCount === 0 || !lastLandmarks){
       toast('没看到手：请把手掌放到摄像头前，等骨架出现');
+      return;
+    }
+    if (handCount > 1){
+      toast('同框有 ' + handCount + ' 只手：检验时请一次只伸一只手');
       return;
     }
     var p = predict(extractFeatures(lastLandmarks));
@@ -427,20 +437,20 @@
     toast('已重新开始');
   }
 
-  function drawSkeleton(lm){
+  function drawSkeleton(lm, color){
     ctx.save();
     ctx.translate(W, 0);
     ctx.scale(-1, 1);
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     CONNECTIONS.forEach(function(c){
-      ctx.strokeStyle = '#00c2ff';
+      ctx.strokeStyle = color;
       ctx.beginPath();
       ctx.moveTo(lm[c[0]].x * W, lm[c[0]].y * H);
       ctx.lineTo(lm[c[1]].x * W, lm[c[1]].y * H);
       ctx.stroke();
     });
-    ctx.fillStyle = '#ff4757';
+    ctx.fillStyle = color;
     lm.forEach(function(p){
       ctx.beginPath();
       ctx.arc(p.x * W, p.y * H, 6, 0, Math.PI * 2);
@@ -448,17 +458,44 @@
     });
     ctx.restore();
   }
+  function drawHandLabel(lm, text, color){
+    ctx.save();
+    ctx.translate(W, 0);
+    ctx.scale(-1, 1);
+    var y = 1e9, x = 0;
+    for (var i = 0; i < 21; i++){
+      if (lm[i].y < y){ y = lm[i].y; x = lm[i].x; }
+    }
+    var px = x * W, py = y * H - 12;
+    ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
+    var w = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(13, 17, 32, .75)';
+    ctx.fillRect(px - w / 2 - 6, py - 18, w + 12, 26);
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, px, py - 5);
+    ctx.restore();
+  }
   function onResults(results){
-    var lm = results.multiHandLandmarks && results.multiHandLandmarks[0];
-    lastLandmarks = lm || null;
-    handPresent = !!lm;
+    var handsList = results.multiHandLandmarks || [];
+    handCount = handsList.length;
+    lastLandmarks = handCount === 1 ? handsList[0] : null;
     ctx.clearRect(0, 0, W, H);
-    if (lm){
-      drawSkeleton(lm);
-      if (totalSamples() > 0){
-        var p = predict(extractFeatures(lm));
-        liveLabel.textContent = p.label;
-        liveConf.textContent = '置信度 ' + Math.round(p.conf * 100) + '%';
+    if (handCount > 0){
+      var labels = [];
+      for (var i = 0; i < handsList.length; i++){
+        var color = HAND_COLORS[i % HAND_COLORS.length];
+        drawSkeleton(handsList[i], color);
+        if (totalSamples() > 0){
+          var p = predict(extractFeatures(handsList[i]));
+          drawHandLabel(handsList[i], p.label + ' ' + Math.round(p.conf * 100) + '%', color);
+          labels.push('手' + (i + 1) + ' ' + p.label + ' ' + Math.round(p.conf * 100) + '%');
+        }
+      }
+      if (labels.length){
+        liveLabel.textContent = labels.join(' · ');
+        liveConf.textContent = '';
       } else {
         liveLabel.textContent = '待训练';
         liveConf.textContent = '（先采集图片）';
@@ -484,7 +521,7 @@
   var hands = null;
   function initHands(){
     hands = new Hands({ locateFile: function(file){ return CDN_BASE + '/' + file; } });
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+    hands.setOptions({ maxNumHands: 4, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
     hands.onResults(onResults);
     var timer = setTimeout(function(){
       if (!videoReady){
