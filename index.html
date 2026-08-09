@@ -726,15 +726,23 @@
   var hands = null;
   var modelReady = false;
   var sourceToken = 0;
-  var sources = [];
-  if (!FORCE_CDN) sources.push('mediapipe');
-  sources.push('https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240');
-  sources.push('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
-  sources.push('https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
-  sources.push('https://gcore.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
-  sources.push('https://unpkg.com/@mediapipe/hands@0.4.1675469240');
+  var sources = buildSources();
   var sourceIdx = 0;
   var sourceTimer = null;
+  function buildSources(){
+    var isLocal = location.protocol === 'file:' ||
+                  location.hostname === 'localhost' ||
+                  location.hostname === '127.0.0.1';
+    var mirror = 'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240';
+    var jsd = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
+    var fastly = 'https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
+    var gcore = 'https://gcore.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
+    var unpkg = 'https://unpkg.com/@mediapipe/hands@0.4.1675469240';
+    if (FORCE_CDN) return [mirror, jsd, fastly, gcore, unpkg];
+    // 本地/离线场景：本机文件优先；公网场景：国内镜像优先（大陆访问最快）
+    return isLocal ? ['mediapipe', mirror, jsd, fastly, gcore, unpkg]
+                   : [mirror, 'mediapipe', jsd, fastly, gcore, unpkg];
+  }
   function sourceName(base){
     if (base === 'mediapipe') return '本机文件';
     if (base.indexOf('npmmirror') >= 0) return '国内镜像';
@@ -803,7 +811,7 @@
         setStatus('当前来源下载太慢，自动切换下一个来源…');
         setTimeout(tryInitSource, 300);
       }
-    }, base === 'mediapipe' ? 8000 : 12000);
+    }, base === 'mediapipe' ? 10000 : 20000);
     hands.initialize().then(function(){
       if (token !== sourceToken) return;
       clearTimeout(sourceTimer);
