@@ -13,10 +13,10 @@
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{background:var(--bg); color:var(--ink); font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; padding:18px;}
-  header{max-width:1080px; margin:0 auto 10px;}
+  header{max-width:1200px; margin:0 auto 10px;}
   h1{font-size:19px;}
   .sub{color:var(--sub); font-size:12px; margin-top:3px; line-height:1.6;}
-  main{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:1fr 400px; gap:16px; align-items:start;}
+  main{max-width:1200px; margin:0 auto; display:grid; grid-template-columns:1fr 460px; gap:16px; align-items:start;}
   .right-panel{align-self:stretch;}
   @media(max-width:900px){ main{grid-template-columns:1fr;} }
   .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
@@ -105,7 +105,7 @@
   .actions{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;}
   #toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:#1d2b4f; color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:99; max-width:80vw;}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-  details{margin:16px auto 30px; max-width:1080px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+  details{margin:12px auto 24px; max-width:1200px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px;}
   summary{cursor:pointer; font-weight:700; font-size:14px;}
   details ol, details ul{padding-left:22px; margin-top:8px; font-size:13px; color:var(--sub); line-height:1.9;}
 </style>
