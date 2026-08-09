@@ -50,6 +50,13 @@
   .dots{display:flex; flex-wrap:wrap; gap:4px; min-height:14px; margin-top:6px;}
   .dots .dot{width:9px; height:9px; border-radius:50%; background:#d8e2f4;}
   .dots .dot.on{background:var(--ok);}
+  .gallery-label{font-size:12px; color:var(--sub); margin-top:10px;}
+  .gallery{display:flex; flex-wrap:wrap; gap:4px; max-height:150px; overflow-y:auto; margin-top:4px;}
+  .gallery:empty::before{content:'（还没有图片）'; font-size:12px; color:var(--sub);}
+  .thumb{position:relative; width:56px; height:42px; padding:0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#0b1020; cursor:pointer; transition:border-color .15s;}
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .thumb .thumb-x{position:absolute; top:2px; right:2px; width:16px; height:16px; line-height:14px; text-align:center; background:rgba(13,17,32,.72); color:#fff; border-radius:50%; font-size:12px; font-weight:700; pointer-events:none;}
+  .thumb:hover{border-color:var(--bad);}
   .divider{border-top:1px dashed var(--line); margin:14px 0;}
   .test-row{display:flex; gap:10px; flex-wrap:wrap;}
   .stat-line{font-size:13px; color:var(--sub); margin-top:10px; line-height:1.7;}
@@ -119,6 +126,10 @@
       <span class="count" id="cntRock">0 / 4</span>
     </div>
     <div class="dots" id="dotsRock"></div>
+    <div class="gallery-label">已采集图片 · 布（点击缩略图可删除这张）</div>
+    <div class="gallery" id="galleryPaper"></div>
+    <div class="gallery-label">已采集图片 · 石头（点击缩略图可删除这张）</div>
+    <div class="gallery" id="galleryRock"></div>
 
     <div class="divider"></div>
     <div class="sec-title"><span class="n">2</span>检验识别率（同学摆手势，老师按实际手势点按钮，AI 来猜）</div>
@@ -157,7 +168,8 @@
   <summary>使用说明与教学建议</summary>
   <ol>
     <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定，可离线）；也可以直接双击 index.html，加载失败时页面会自动改用联网模式重试。</li>
-    <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。</li>
+    <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
+    <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
     <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
@@ -214,6 +226,7 @@
   var roundBadge = $('roundBadge');
   var cntPaper = $('cntPaper'), cntRock = $('cntRock');
   var dotsPaper = $('dotsPaper'), dotsRock = $('dotsRock');
+  var galleryPaper = $('galleryPaper'), galleryRock = $('galleryRock');
   var btnCollectPaper = $('btnCollectPaper'), btnCollectRock = $('btnCollectRock');
   var btnTestPaper = $('btnTestPaper'), btnTestRock = $('btnTestRock');
   var testStat = $('testStat'), testHistory = $('testHistory');
@@ -225,14 +238,17 @@
   var inT1 = $('inT1'), inT2 = $('inT2');
   var toastEl = $('toast');
 
+  var SAVE_KEY = 'bushi-shi-tou-v1';
   var state = {
     round: 1,
     samples: { '布': [], '石头': [] },
-    tests: { correct: 0, total: 0 },
+    byLabel: { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } },
     confSum: 0,
     r1: null,
     r2: null
   };
+  function testTotal(){ return state.byLabel['布'].total + state.byLabel['石头'].total; }
+  function testCorrect(){ return state.byLabel['布'].correct + state.byLabel['石头'].correct; }
   function t1(){ var v = parseInt(inT1.value, 10) || 4; return Math.min(30, Math.max(2, v)); }
   function t2(){ var v = parseInt(inT2.value, 10) || 20; return Math.min(60, Math.max(4, v)); }
   function targets(){ return { '布': state.round === 1 ? t1() : t2(), '石头': state.round === 1 ? t1() : t2() }; }
@@ -256,6 +272,13 @@
   function autoSwitchCdn(){
     setStatus('本地模式加载失败，正在自动切换联网模式重试…', 'error');
     setTimeout(function(){ location.replace('?cdn=1'); }, 1200);
+  }
+  function autoRetryOnce(){
+    try {
+      if (sessionStorage.getItem('loadRetried')) return false;
+      sessionStorage.setItem('loadRetried', '1');
+      return true;
+    } catch(e){ return true; }
   }
   function toast(msg){
     toastEl.textContent = msg;
@@ -284,7 +307,7 @@
   function predict(feats){
     var rows = [];
     LABELS.forEach(function(label){
-      state.samples[label].forEach(function(f){ rows.push({ label: label, d: dist(f, feats) }); });
+      state.samples[label].forEach(function(s){ rows.push({ label: label, d: dist(s.f, feats) }); });
     });
     if (!rows.length) return null;
     rows.sort(function(a, b){ return a.d - b.d; });
@@ -315,16 +338,17 @@
     var done = targetsDone();
     btnTestPaper.disabled = !done;
     btnTestRock.disabled = !done;
-    btnNextRound.disabled = state.r2 !== null || !(done && state.tests.total > 0);
+    btnNextRound.disabled = state.r2 !== null || !(done && testTotal() > 0);
     trainInfo.textContent = '训练集：布 ' + state.samples['布'].length + ' 张 + 石头 ' + state.samples['石头'].length + ' 张 = ' + totalSamples() + ' 张（每次识别都用全部样本投票）';
   }
   function renderTestStat(){
-    var t = state.tests.total;
+    var t = testTotal();
     if (!t){
       testStat.textContent = '第 ' + state.round + ' 轮：还没有检验记录';
       return;
     }
-    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + state.tests.correct + '</b> 次，准确率 <b>' + pct(state.tests.correct, t) + '%</b>（平均置信度 ' + Math.round(state.confSum / t * 100) + '%）';
+    var b = state.byLabel;
+    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + testCorrect() + '</b> 次，准确率 <b>' + pct(testCorrect(), t) + '%</b>（平均置信度 ' + Math.round(state.confSum / t * 100) + '%）· 布 <b>' + b['布'].correct + '/' + b['布'].total + '</b> · 石头 <b>' + b['石头'].correct + '/' + b['石头'].total + '</b>';
   }
   function addHistory(ok){
     var c = document.createElement('span');
@@ -336,7 +360,7 @@
   function renderRoundCard(elS, elA, elC, d){
     elS.textContent = d.samples;
     elA.textContent = pct(d.correct, d.total) + '%';
-    elC.textContent = '平均置信度 ' + Math.round(d.confAvg * 100) + '%' + (d.correct === d.total ? '（全对）' : '');
+    elC.textContent = '平均置信度 ' + Math.round(d.confAvg * 100) + '% · 布 ' + d.byLabel['布'].correct + '/' + d.byLabel['布'].total + ' · 石头 ' + d.byLabel['石头'].correct + '/' + d.byLabel['石头'].total;
   }
   function renderCompare(){
     compareBox.hidden = false;
@@ -367,14 +391,15 @@
     var feats = extractFeatures(lastLandmarks);
     if (state.samples[label].length > 0){
       var minD = 1e9;
-      state.samples[label].forEach(function(f){ var d = dist(f, feats); if (d < minD) minD = d; });
+      state.samples[label].forEach(function(s){ var d = dist(s.f, feats); if (d < minD) minD = d; });
       if (minD < 0.2){
         toast('手型跟已采集的图片太像了，请换个角度或位置再拍');
         return;
       }
     }
-    state.samples[label].push(feats);
-    renderCounts();
+    state.samples[label].push({ f: feats, img: captureThumb(lastLandmarks) });
+    save();
+    renderAll();
     var n = state.samples[label].length, tg = targets()[label];
     if (targetsDone()){
       testStat.textContent = '第 ' + state.round + ' 轮：两类已采满，可以开始检验了！';
@@ -400,74 +425,184 @@
       return;
     }
     var ok = p.label === label;
-    state.tests.total++;
-    if (ok) state.tests.correct++;
+    state.byLabel[label].total++;
+    if (ok) state.byLabel[label].correct++;
     state.confSum += p.conf;
     addHistory(ok);
-    renderTestStat();
-    renderCounts();
+    save();
+    renderAll();
     if (ok){
       toast('✓ 识别正确！AI 说「' + p.label + '」，置信度 ' + Math.round(p.conf * 100) + '%');
     } else {
       toast('✗ 识别错了：AI 说「' + p.label + '」，实际是「' + label + '」');
     }
   }
+  function snapshot(){
+    return {
+      correct: testCorrect(),
+      total: testTotal(),
+      samples: totalSamples(),
+      confAvg: testTotal() ? state.confSum / testTotal() : 0,
+      byLabel: {
+        '布': { correct: state.byLabel['布'].correct, total: state.byLabel['布'].total },
+        '石头': { correct: state.byLabel['石头'].correct, total: state.byLabel['石头'].total }
+      }
+    };
+  }
   function nextRound(){
-    var t = state.tests;
     if (state.r1 === null){
-      state.r1 = { correct: t.correct, total: t.total, samples: totalSamples(), confAvg: t.total ? state.confSum / t.total : 0 };
-      renderRoundCard(r1Samples, r1Acc, r1Conf, state.r1);
+      state.r1 = snapshot();
       state.round = 2;
-      t.correct = 0; t.total = 0;
+      state.byLabel = { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
       state.confSum = 0;
       testHistory.innerHTML = '';
-      r2Card.classList.remove('hidden');
-      roundBadge.classList.add('r2');
-      roundBadge.textContent = '第 2 轮 · 每类 ' + t2() + ' 张';
-      btnNextRound.textContent = '完成第2轮检验，查看对比结果';
-      renderCounts();
-      renderTestStat();
+      save();
+      renderAll();
       toast('第 2 轮开始！给「布」和「石头」各增加采集到 ' + t2() + ' 张，再用刚才那位同学检验');
     } else if (state.r2 === null){
-      state.r2 = { correct: t.correct, total: t.total, samples: totalSamples(), confAvg: t.total ? state.confSum / t.total : 0 };
-      renderRoundCard(r2Samples, r2Acc, r2Conf, state.r2);
-      renderCompare();
-      btnNextRound.disabled = true;
-      btnNextRound.textContent = '实验完成';
-      var a1 = pct(state.r1.correct, state.r1.total);
-      var a2 = pct(state.r2.correct, state.r2.total);
-      if (a2 > a1){
-        conclusion.className = 'conclusion';
-        conclusion.textContent = '实验完成：训练图片从 ' + state.r1.samples + ' 张增加到 ' + state.r2.samples + ' 张，准确率 ' + a1 + '% → ' + a2 + '%——数据越多，识别越准！';
-      } else if (a2 === a1){
-        conclusion.className = 'conclusion';
-        conclusion.textContent = '实验完成：准确率持平（' + a1 + '%）。数据变多了准确率却没变，请同学们想想为什么？';
-      } else {
-        conclusion.className = 'conclusion bad';
-        conclusion.textContent = '实验完成：准确率 ' + a1 + '% → ' + a2 + '% 反而下降了。请同学们讨论：数据更多了，为什么识别更差？（数据质量同样重要）';
-      }
-      conclusion.style.display = 'block';
-      toast('实验完成！样本 ' + state.r1.samples + ' 张 → ' + state.r2.samples + ' 张，准确率 ' + a1 + '% → ' + a2 + '%');
+      state.r2 = snapshot();
+      save();
+      renderAll();
+      toast('实验完成！样本 ' + state.r1.samples + ' 张 → ' + state.r2.samples + ' 张，准确率 ' + pct(state.r1.correct, state.r1.total) + '% → ' + pct(state.r2.correct, state.r2.total) + '%');
       conclusion.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
   function resetAll(){
-    if (!confirm('确定清空所有数据，重新开始吗？')) return;
+    if (!confirm('确定清空所有数据（包括已采集图片），重新开始吗？')) return;
     state.round = 1;
     state.samples = { '布': [], '石头': [] };
-    state.tests = { correct: 0, total: 0 };
+    state.byLabel = { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
     state.confSum = 0;
     state.r1 = state.r2 = null;
     testHistory.innerHTML = '';
-    r2Card.classList.add('hidden');
-    compareBox.hidden = true;
-    conclusion.style.display = 'none';
-    roundBadge.classList.remove('r2');
-    roundBadge.textContent = '第 1 轮 · 每类 ' + t1() + ' 张';
-    btnNextRound.textContent = '完成第1轮检验，进入第2轮';
+    try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+    renderAll();
+    toast('已重新开始');
+  }
+
+  function save(){
+    var data = { v: 1, round: state.round, byLabel: state.byLabel, confSum: state.confSum, r1: state.r1, r2: state.r2 };
+    data.samples = {};
+    LABELS.forEach(function(label){
+      data.samples[label] = state.samples[label].map(function(s){ return { f: s.f, img: s.img }; });
+    });
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch(e){
+      LABELS.forEach(function(label){
+        data.samples[label] = state.samples[label].map(function(s){ return { f: s.f }; });
+      });
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); }
+      catch(e2){}
+    }
+  }
+  function restore(){
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      var d = JSON.parse(raw);
+      if (!d || d.v !== 1) return false;
+      state.round = d.round === 2 ? 2 : 1;
+      state.byLabel = d.byLabel || { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
+      state.confSum = d.confSum || 0;
+      state.r1 = d.r1 || null;
+      state.r2 = d.r2 || null;
+      LABELS.forEach(function(label){
+        state.samples[label] = (d.samples && d.samples[label]) ? d.samples[label].map(function(s){
+          return { f: s.f, img: s.img || null };
+        }) : [];
+      });
+      return true;
+    } catch(e){ return false; }
+  }
+  function captureThumb(lm){
+    var t = document.createElement('canvas');
+    t.width = 120; t.height = 90;
+    var tc = t.getContext('2d');
+    tc.translate(120, 0);
+    tc.scale(-1, 1);
+    tc.drawImage(video, 0, 0, 120, 90);
+    tc.lineWidth = 2;
+    tc.lineCap = 'round';
+    CONNECTIONS.forEach(function(c){
+      tc.strokeStyle = '#00c2ff';
+      tc.beginPath();
+      tc.moveTo(lm[c[0]].x * 120, lm[c[0]].y * 90);
+      tc.lineTo(lm[c[1]].x * 120, lm[c[1]].y * 90);
+      tc.stroke();
+    });
+    tc.fillStyle = '#ff4757';
+    lm.forEach(function(p){
+      tc.beginPath();
+      tc.arc(p.x * 120, p.y * 90, 2, 0, Math.PI * 2);
+      tc.fill();
+    });
+    return t.toDataURL('image/jpeg', 0.75);
+  }
+  function renderGallery(el, label){
+    el.innerHTML = '';
+    state.samples[label].forEach(function(s, idx){
+      if (!s.img) return;
+      var b = document.createElement('button');
+      b.className = 'thumb';
+      b.title = '删除这张「' + label + '」';
+      var img = document.createElement('img');
+      img.src = s.img;
+      img.alt = label + '样本' + (idx + 1);
+      b.appendChild(img);
+      var x = document.createElement('span');
+      x.className = 'thumb-x';
+      x.textContent = '×';
+      b.appendChild(x);
+      b.addEventListener('click', function(){
+        if (!confirm('删除这张「' + label + '」图片吗？')) return;
+        state.samples[label].splice(idx, 1);
+        save();
+        renderAll();
+        toast('已删除 1 张「' + label + '」');
+      });
+      el.appendChild(b);
+    });
+  }
+  function showConclusion(){
+    var a1 = pct(state.r1.correct, state.r1.total);
+    var a2 = pct(state.r2.correct, state.r2.total);
+    if (a2 > a1){
+      conclusion.className = 'conclusion';
+      conclusion.textContent = '实验完成：训练图片从 ' + state.r1.samples + ' 张增加到 ' + state.r2.samples + ' 张，准确率 ' + a1 + '% → ' + a2 + '%——数据越多，识别越准！';
+    } else if (a2 === a1){
+      conclusion.className = 'conclusion';
+      conclusion.textContent = '实验完成：准确率持平（' + a1 + '%）。数据变多了准确率却没变，请同学们想想为什么？';
+    } else {
+      conclusion.className = 'conclusion bad';
+      conclusion.textContent = '实验完成：准确率 ' + a1 + '% → ' + a2 + '% 反而下降了。请同学们讨论：数据更多了，为什么识别更差？（数据质量同样重要）';
+    }
+    conclusion.style.display = 'block';
+  }
+  function renderAll(){
+    roundBadge.textContent = '第 ' + state.round + ' 轮 · 每类 ' + (state.round === 1 ? t1() : t2()) + ' 张';
+    roundBadge.classList.toggle('r2', state.round === 2);
+    r2Card.classList.toggle('hidden', state.r1 === null);
+    btnNextRound.textContent = state.r1 === null ? '完成第1轮检验，进入第2轮' : (state.r2 === null ? '完成第2轮检验，查看对比结果' : '实验完成');
+    if (state.r1){
+      renderRoundCard(r1Samples, r1Acc, r1Conf, state.r1);
+    } else {
+      r1Samples.textContent = '—';
+      r1Acc.textContent = '—';
+      r1Conf.textContent = '';
+    }
+    if (state.r2){
+      renderRoundCard(r2Samples, r2Acc, r2Conf, state.r2);
+      renderCompare();
+      showConclusion();
+    } else {
+      conclusion.style.display = 'none';
+      compareBox.hidden = true;
+    }
     renderCounts();
     renderTestStat();
-    toast('已重新开始');
+    renderGallery(galleryPaper, '布');
+    renderGallery(galleryRock, '石头');
   }
 
   function drawSkeleton(lm, color){
@@ -556,9 +691,15 @@
     hands.onResults(onResults);
     var timer = setTimeout(function(){
       if (!modelReady){
-        setStatus('模型加载超时（超过 40 秒）', 'error');
-        if (!FORCE_CDN && location.protocol === 'file:') autoSwitchCdn();
-        else showRetryHelp();
+        if (!FORCE_CDN && location.protocol === 'file:'){
+          autoSwitchCdn();
+        } else if (autoRetryOnce()){
+          statusText.textContent = '模型加载较慢（文件约 10MB），正在自动重试一次…';
+          setTimeout(function(){ location.reload(); }, 1500);
+        } else {
+          setStatus('模型加载超时：模型文件约 10MB，网络慢时加载会超时。请刷新页面重试（第二次会快很多），或换个网络再试', 'error');
+          showRetryHelp();
+        }
       } else if (!videoReady){
         setStatus('模型已就绪，但摄像头没有开启：请点击浏览器地址栏的摄像头图标允许访问，然后重试', 'error');
         showRetryHelp();
@@ -607,8 +748,9 @@
     renderCounts();
   });
 
-  renderCounts();
-  renderTestStat();
+  var restored = restore();
+  renderAll();
+  if (restored) toast('已恢复上次的实验数据（检验历史记录不保留）');
   initHands();
 })();
 </script>
