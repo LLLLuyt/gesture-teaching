@@ -76,6 +76,7 @@
   .round-card .extra{font-size:12px; margin-top:2px;}
   .hidden{display:none !important;}
   .compare{margin-top:10px;}
+  .compare-line{margin-top:8px; font-size:12px; color:var(--sub);}
   .bar-row{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--sub);}
   .bar-row .bar-name{width:92px; flex:none; text-align:right;}
   .bar{flex:1; height:16px; background:#e6edfa; border-radius:8px; overflow:hidden;}
@@ -168,6 +169,7 @@
     <div class="compare" id="compareBox" hidden>
       <div class="bar-row"><span class="bar-name">第 1 轮</span><div class="bar"><i id="bar1"></i></div><span class="bar-num" id="num1"></span></div>
       <div class="bar-row"><span class="bar-name">第 2 轮</span><div class="bar"><i id="bar2"></i></div><span class="bar-num" id="num2"></span></div>
+      <div class="compare-line" id="distLine"></div>
     </div>
     <div class="conclusion" id="conclusion">实验完成：训练图片越多，识别准确率越高！</div>
 
@@ -190,7 +192,7 @@
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
-    <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时可以让学生重点观察「平均置信度」的提升，或把第 1 轮张数改成 2 张，差距会更明显。</li>
+    <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时让学生看「平均匹配距离」：数据越多，AI 平均离见过的照片越近，这个数字会明显变小——即使准确率两轮都是 100%，也能看出数据的作用。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
     <li>课前 30 分钟检查清单（防止上课出意外）：① 所有设备打开一次页面并允许摄像头，确认状态栏显示"就绪"；② 每台设备摆个「布」手势，确认骨架贴手；③ 老师演示机用「启动服务器.bat」离线打开，不依赖网络；④ 正式上课前不要再改代码、不要再刷新已备好的页面。</li>
   </ol>
@@ -250,7 +252,7 @@
   var inTC = $('inTC');
   var r1Card = $('r1Card'), r1Samples = $('r1Samples'), r1Acc = $('r1Acc'), r1Conf = $('r1Conf');
   var r2Card = $('r2Card'), r2Samples = $('r2Samples'), r2Acc = $('r2Acc'), r2Conf = $('r2Conf');
-  var compareBox = $('compareBox'), bar1 = $('bar1'), bar2 = $('bar2'), num1 = $('num1'), num2 = $('num2');
+  var compareBox = $('compareBox'), bar1 = $('bar1'), bar2 = $('bar2'), num1 = $('num1'), num2 = $('num2'), distLine = $('distLine');
   var conclusion = $('conclusion');
   var btnNextRound = $('btnNextRound'), btnReset = $('btnReset');
   var inT1 = $('inT1'), inT2 = $('inT2');
@@ -281,6 +283,7 @@
     samples: { '布': [], '石头': [] },
     byLabel: { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } },
     confSum: 0,
+    distSum: 0,
     r1: null,
     r2: null
   };
@@ -381,7 +384,7 @@
     for (var i = 0; i < k; i++) votes[rows[i].label]++;
     var label = votes['布'] >= votes['石头'] ? '布' : '石头';
     if (votes['布'] === votes['石头']) label = rows[0].label;
-    return { label: label, conf: Math.max(votes['布'], votes['石头']) / k };
+    return { label: label, conf: Math.max(votes['布'], votes['石头']) / k, near: rows[0].d };
   }
 
   function renderDots(el, label, target){
@@ -417,7 +420,7 @@
       return;
     }
     var b = state.byLabel;
-    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + testCorrect() + '</b> 次，准确率 <b>' + pct(testCorrect(), t) + '%</b>（平均置信度 ' + Math.round(state.confSum / t * 100) + '%）· 布 <b>' + b['布'].correct + '/' + b['布'].total + '</b> · 石头 <b>' + b['石头'].correct + '/' + b['石头'].total + '</b>';
+    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + testCorrect() + '</b> 次，准确率 <b>' + pct(testCorrect(), t) + '%</b>（平均匹配距离 <b>' + (state.distSum / t).toFixed(2) + '</b>）· 布 <b>' + b['布'].correct + '/' + b['布'].total + '</b> · 石头 <b>' + b['石头'].correct + '/' + b['石头'].total + '</b>';
   }
   function addHistory(ok){
     var c = document.createElement('span');
@@ -429,7 +432,7 @@
   function renderRoundCard(elS, elA, elC, d){
     elS.textContent = d.samples;
     elA.textContent = pct(d.correct, d.total) + '%';
-    elC.textContent = '平均置信度 ' + Math.round(d.confAvg * 100) + '% · 布 ' + d.byLabel['布'].correct + '/' + d.byLabel['布'].total + ' · 石头 ' + d.byLabel['石头'].correct + '/' + d.byLabel['石头'].total;
+    elC.textContent = '平均匹配距离 ' + (typeof d.distAvg === 'number' ? d.distAvg.toFixed(2) : '—') + ' · 布 ' + d.byLabel['布'].correct + '/' + d.byLabel['布'].total + ' · 石头 ' + d.byLabel['石头'].correct + '/' + d.byLabel['石头'].total;
   }
   function renderCompare(){
     compareBox.hidden = false;
@@ -439,6 +442,9 @@
     bar2.style.width = a2 + '%';
     num1.textContent = a1 + '%';
     num2.textContent = a2 + '%';
+    var d1 = typeof state.r1.distAvg === 'number' ? state.r1.distAvg.toFixed(2) : '—';
+    var d2 = typeof state.r2.distAvg === 'number' ? state.r2.distAvg.toFixed(2) : '—';
+    distLine.textContent = '平均匹配距离：第1轮 ' + d1 + ' → 第2轮 ' + d2 + '（越小说明 AI 见过的姿势越接近）';
   }
 
   function doCollect(label){
@@ -551,6 +557,7 @@
     state.byLabel[testTarget].total++;
     if (ok) state.byLabel[testTarget].correct++;
     state.confSum += p.conf;
+    state.distSum += p.near;
     addHistory(ok);
     save();
     renderAll();
@@ -574,6 +581,7 @@
       total: testTotal(),
       samples: totalSamples(),
       confAvg: testTotal() ? state.confSum / testTotal() : 0,
+      distAvg: testTotal() ? state.distSum / testTotal() : 0,
       byLabel: {
         '布': { correct: state.byLabel['布'].correct, total: state.byLabel['布'].total },
         '石头': { correct: state.byLabel['石头'].correct, total: state.byLabel['石头'].total }
@@ -586,6 +594,7 @@
       state.round = 2;
       state.byLabel = { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
       state.confSum = 0;
+      state.distSum = 0;
       testHistory.innerHTML = '';
       save();
       renderAll();
@@ -608,6 +617,7 @@
     state.samples = { '布': [], '石头': [] };
     state.byLabel = { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
     state.confSum = 0;
+    state.distSum = 0;
     state.r1 = state.r2 = null;
     testHistory.innerHTML = '';
     try { localStorage.removeItem(SAVE_KEY); } catch(e){}
@@ -616,7 +626,7 @@
   }
 
   function save(){
-    var data = { v: 1, round: state.round, byLabel: state.byLabel, confSum: state.confSum, r1: state.r1, r2: state.r2 };
+    var data = { v: 1, round: state.round, byLabel: state.byLabel, confSum: state.confSum, distSum: state.distSum, r1: state.r1, r2: state.r2 };
     data.samples = {};
     LABELS.forEach(function(label){
       data.samples[label] = state.samples[label].map(function(s){ return { f: s.f, img: s.img }; });
@@ -640,6 +650,7 @@
       state.round = d.round === 2 ? 2 : 1;
       state.byLabel = d.byLabel || { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
       state.confSum = d.confSum || 0;
+      state.distSum = d.distSum || 0;
       state.r1 = d.r1 || null;
       state.r2 = d.r2 || null;
       LABELS.forEach(function(label){
