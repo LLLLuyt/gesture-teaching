@@ -29,6 +29,7 @@
   .status .dot-pulse{width:8px; height:8px; border-radius:50%; background:var(--amber);}
   .status.ready .dot-pulse{background:var(--ok);}
   .status.error{color:var(--bad);}
+  .status a.link-inline{color:#fff;}
   .round-badge{display:inline-block; background:var(--blue); color:#fff; padding:4px 14px; border-radius:999px; font-size:14px; font-weight:700;}
   .round-badge.r2{background:var(--cyan);}
   .config{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; font-size:13px; color:var(--sub); align-items:center;}
@@ -68,6 +69,7 @@
   .bar i{display:block; height:100%; min-width:2px; background:linear-gradient(90deg,var(--cyan),var(--blue)); border-radius:8px;}
   .bar-row .bar-num{width:44px; flex:none; font-weight:700; color:var(--ink);}
   .conclusion{margin-top:10px; padding:10px 12px; border-radius:10px; background:#ecfdf3; border:1px solid #b9f2cd; font-size:14px; font-weight:700; color:#15803d; display:none;}
+  .conclusion.bad{background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;}
   .actions{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
   #toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:#1d2b4f; color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:99; max-width:80vw;}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
@@ -232,8 +234,8 @@
     r1: null,
     r2: null
   };
-  function t1(){ return Math.max(2, parseInt(inT1.value, 10) || 4); }
-  function t2(){ return Math.max(4, parseInt(inT2.value, 10) || 20); }
+  function t1(){ var v = parseInt(inT1.value, 10) || 4; return Math.min(30, Math.max(2, v)); }
+  function t2(){ var v = parseInt(inT2.value, 10) || 20; return Math.min(60, Math.max(4, v)); }
   function targets(){ return { '布': state.round === 1 ? t1() : t2(), '石头': state.round === 1 ? t1() : t2() }; }
 
   var lastLandmarks = null;
@@ -241,10 +243,14 @@
   var videoReady = false;
   var lastCollectAt = 0;
   var toastTimer = null;
+  var sending = false;
 
   function setStatus(text, kind){
     statusText.textContent = text;
     statusBar.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function showFileModeHelp(){
+    statusText.innerHTML = '加载失败。<a href="?cdn=1" class="link-inline">点这里改用联网模式</a>，或双击「启动服务器.bat」';
   }
   function toast(msg){
     toastEl.textContent = msg;
@@ -353,10 +359,20 @@
       toast('「' + label + '」已经够多了，每类最多 60 张');
       return;
     }
-    state.samples[label].push(extractFeatures(lastLandmarks));
+    var feats = extractFeatures(lastLandmarks);
+    if (state.samples[label].length > 0){
+      var minD = 1e9;
+      state.samples[label].forEach(function(f){ var d = dist(f, feats); if (d < minD) minD = d; });
+      if (minD < 0.2){
+        toast('手型跟已采集的图片太像了，请换个角度或位置再拍');
+        return;
+      }
+    }
+    state.samples[label].push(feats);
     renderCounts();
     var n = state.samples[label].length, tg = targets()[label];
     if (targetsDone()){
+      testStat.textContent = '第 ' + state.round + ' 轮：两类已采满，可以开始检验了！';
       toast('两类都采满了！点击下方按钮开始检验');
     } else if (n >= tg){
       toast('「' + label + '」已采满 ' + n + ' 张！');
@@ -413,8 +429,20 @@
       renderCompare();
       btnNextRound.disabled = true;
       btnNextRound.textContent = '实验完成';
+      var a1 = pct(state.r1.correct, state.r1.total);
+      var a2 = pct(state.r2.correct, state.r2.total);
+      if (a2 > a1){
+        conclusion.className = 'conclusion';
+        conclusion.textContent = '实验完成：训练图片从 ' + state.r1.samples + ' 张增加到 ' + state.r2.samples + ' 张，准确率 ' + a1 + '% → ' + a2 + '%——数据越多，识别越准！';
+      } else if (a2 === a1){
+        conclusion.className = 'conclusion';
+        conclusion.textContent = '实验完成：准确率持平（' + a1 + '%）。数据变多了准确率却没变，请同学们想想为什么？';
+      } else {
+        conclusion.className = 'conclusion bad';
+        conclusion.textContent = '实验完成：准确率 ' + a1 + '% → ' + a2 + '% 反而下降了。请同学们讨论：数据更多了，为什么识别更差？（数据质量同样重要）';
+      }
       conclusion.style.display = 'block';
-      toast('实验完成！样本 ' + state.r1.samples + ' 张 → ' + state.r2.samples + ' 张，准确率 ' + pct(state.r1.correct, state.r1.total) + '% → ' + pct(state.r2.correct, state.r2.total) + '%');
+      toast('实验完成！样本 ' + state.r1.samples + ' 张 → ' + state.r2.samples + ' 张，准确率 ' + a1 + '% → ' + a2 + '%');
       conclusion.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
@@ -459,14 +487,12 @@
     ctx.restore();
   }
   function drawHandLabel(lm, text, color){
-    ctx.save();
-    ctx.translate(W, 0);
-    ctx.scale(-1, 1);
     var y = 1e9, x = 0;
     for (var i = 0; i < 21; i++){
       if (lm[i].y < y){ y = lm[i].y; x = lm[i].x; }
     }
-    var px = x * W, py = y * H - 12;
+    var px = (1 - x) * W;
+    var py = Math.max(y * H - 12, 20);
     ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
     var w = ctx.measureText(text).width;
     ctx.fillStyle = 'rgba(13, 17, 32, .75)';
@@ -475,7 +501,6 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, px, py - 5);
-    ctx.restore();
   }
   function onResults(results){
     var handsList = results.multiHandLandmarks || [];
@@ -526,9 +551,7 @@
     var timer = setTimeout(function(){
       if (!videoReady){
         setStatus('模型加载超时', 'error');
-        if (!FORCE_CDN && location.protocol === 'file:'){
-          statusText.innerHTML = '直接打开文件加载失败，<a href="?cdn=1" style="color:#fff">点这里改用联网模式</a>，或双击「启动服务器.bat」';
-        }
+        if (!FORCE_CDN && location.protocol === 'file:') showFileModeHelp();
       }
     }, 20000);
     hands.initialize().then(function(){
@@ -540,11 +563,13 @@
       requestAnimationFrame(loop);
     }).catch(function(e){
       setStatus('初始化失败：' + (e && e.message ? e.message : e), 'error');
+      if (!FORCE_CDN && location.protocol === 'file:') showFileModeHelp();
     });
   }
   function loop(){
-    if (videoReady && video.readyState >= 2){
-      hands.send({ image: video }).catch(function(){});
+    if (!sending && videoReady && video.readyState >= 2){
+      sending = true;
+      hands.send({ image: video }).then(function(){ sending = false; }, function(){ sending = false; });
     }
     requestAnimationFrame(loop);
   }
