@@ -301,7 +301,6 @@
   var testSame = 0;
   var testLast = '';
   var testAt = 0;
-  var awaitChange = false;
   var countdownTimer = null;
 
   function setStatus(text, kind){
@@ -515,7 +514,6 @@
       testSame = 0;
       testLast = '';
       testAt = 0;
-      awaitChange = false;
       renderAll();
       toast('开始！请同学做出「布」手势');
     });
@@ -539,13 +537,6 @@
   }
   function autoTestTick(p){
     if (!testActive || !p) return;
-    if (awaitChange){
-      if (p.label === testLast) return;
-      awaitChange = false;
-      testSame = 1;
-      testLast = p.label;
-      return;
-    }
     if (p.label === testLast){
       testSame++;
     } else {
@@ -556,7 +547,6 @@
     if (Date.now() - testAt < 2000) return;
     testAt = Date.now();
     testSame = 0;
-    awaitChange = true;
     var ok = p.label === testTarget;
     state.byLabel[testTarget].total++;
     if (ok) state.byLabel[testTarget].correct++;
@@ -564,6 +554,7 @@
     addHistory(ok);
     save();
     renderAll();
+    toast(ok ? '✓ 识别正确（' + p.label + '）' : '✗ 识别错了：AI 说「' + p.label + '」');
     if (testTotal() >= tc()){
       endAutoTest();
       toast('本轮检验完成！共 ' + testTotal() + ' 次，准确率 ' + pct(testCorrect(), testTotal()) + '%');
@@ -574,7 +565,7 @@
     startCountdown(3, '下一题「' + testTarget + '」将在 {n} 秒后开始…', function(){
       testActive = true;
       renderAll();
-      toast(ok ? '✓ 识别正确！请同学做出「' + testTarget + '」' : '✗ 识别错了（AI 说「' + p.label + '」）。请同学做出「' + testTarget + '」');
+      toast('请同学做出「' + testTarget + '」');
     });
   }
   function snapshot(){
