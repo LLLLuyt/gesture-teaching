@@ -13,12 +13,12 @@
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{background:var(--bg); color:var(--ink); font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; padding:18px;}
-  header{max-width:1080px; margin:0 auto 14px;}
-  h1{font-size:22px;}
-  .sub{color:var(--sub); font-size:13px; margin-top:4px; line-height:1.7;}
+  header{max-width:1080px; margin:0 auto 10px;}
+  h1{font-size:19px;}
+  .sub{color:var(--sub); font-size:12px; margin-top:3px; line-height:1.6;}
   main{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:1fr 400px; gap:16px; align-items:start;}
   @media(max-width:900px){ main{grid-template-columns:1fr;} }
-  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
   .cam-card{display:flex; flex-direction:column;}
   .cam-wrap{position:relative; height:min(50vh, 480px); min-height:300px;}
   video{width:100%; height:100%; object-fit:cover; display:block; border-radius:10px; transform:scaleX(-1); background:#0b1020;}
@@ -33,16 +33,16 @@
   .status a.link-inline{color:#fff;}
   .round-badge{display:inline-block; background:var(--blue); color:#fff; padding:4px 14px; border-radius:999px; font-size:14px; font-weight:700;}
   .round-badge.r2{background:var(--cyan);}
-  .config{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; font-size:13px; color:var(--sub); align-items:center;}
+  .config{display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; font-size:13px; color:var(--sub); align-items:center;}
   .config input{width:56px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
-  .mode-row{display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--sub); flex-wrap:wrap;}
+  .mode-row{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; color:var(--sub); flex-wrap:wrap;}
   .mode-btn{font-size:13px; padding:6px 12px; background:#eef2f9; color:var(--sub); font-weight:700;}
   .mode-btn.on{background:var(--blue); color:#fff;}
   .mode-tip{font-size:12px; color:var(--sub);}
-  .sec-title{font-size:14px; font-weight:700; margin:14px 0 8px; display:flex; align-items:center; gap:6px;}
+  .sec-title{font-size:14px; font-weight:700; margin:10px 0 6px; display:flex; align-items:center; gap:6px;}
   .sec-title .n{display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--blue); color:#fff; font-size:11px; align-items:center; justify-content:center; flex:none;}
   .collect-row{display:flex; align-items:center; gap:10px;}
-  .collect-row + .collect-row{margin-top:8px;}
+  .collect-row + .collect-row{margin-top:6px;}
   button{font-family:inherit; font-size:16px; font-weight:700; padding:10px 16px; border:none; border-radius:10px; cursor:pointer; transition:transform .06s, opacity .15s;}
   button:active{transform:scale(.97);}
   button:disabled{opacity:.4; cursor:not-allowed;}
@@ -52,27 +52,27 @@
   .btn-ghost{background:#eef2f9; color:var(--sub); font-size:14px;}
   .btn-ghost:hover{background:#e2e9f6;}
   .count{font-size:14px; font-weight:700; min-width:74px;}
-  .dots{display:flex; flex-wrap:wrap; gap:4px; min-height:14px; margin-top:6px;}
+  .dots{display:flex; flex-wrap:wrap; gap:4px; min-height:12px; margin-top:4px;}
   .dots .dot{width:9px; height:9px; border-radius:50%; background:#d8e2f4;}
   .dots .dot.on{background:var(--ok);}
-  .gallery-label{font-size:12px; color:var(--sub); margin-top:10px;}
-  .gallery{display:flex; flex-wrap:wrap; gap:4px; height:150px; overflow-y:auto; margin-top:4px; align-content:flex-start;}
+  .gallery-label{font-size:12px; color:var(--sub); margin-top:8px;}
+  .gallery{display:flex; flex-wrap:wrap; gap:4px; height:108px; overflow-y:auto; margin-top:4px; align-content:flex-start;}
   .gallery:empty::before{content:'（还没有图片）'; font-size:12px; color:var(--sub);}
   .thumb{position:relative; width:56px; height:42px; padding:0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#0b1020; cursor:pointer; transition:border-color .15s;}
   .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
   .thumb .thumb-x{position:absolute; top:2px; right:2px; width:16px; height:16px; line-height:14px; text-align:center; background:rgba(13,17,32,.72); color:#fff; border-radius:50%; font-size:12px; font-weight:700; pointer-events:none;}
   .thumb:hover{border-color:var(--bad);}
-  .divider{border-top:1px dashed var(--line); margin:14px 0;}
+  .divider{border-top:1px dashed var(--line); margin:10px 0;}
   .test-row{display:flex; gap:10px; flex-wrap:wrap;}
-  .stat-line{font-size:13px; color:var(--sub); margin-top:10px; line-height:1.7;}
+  .stat-line{font-size:13px; color:var(--sub); margin-top:8px; line-height:1.7;}
   .stat-line b{color:var(--ink);}
   .stat-line .tgt{color:var(--blue); font-size:17px;}
-  .history{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:22px;}
+  .history{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; min-height:20px;}
   .chip{width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff;}
   .chip.ok{background:var(--ok);}
   .chip.bad{background:var(--bad);}
-  .round-card{border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:8px; font-size:13px; color:var(--sub); background:#f8fbff;}
-  .round-card .acc{color:var(--blue); font-size:22px; font-weight:800; margin-top:2px;}
+  .round-card{border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-top:6px; font-size:13px; color:var(--sub); background:#f8fbff;}
+  .round-card .acc{color:var(--blue); font-size:18px; font-weight:800; margin-top:2px;}
   .round-card .extra{font-size:12px; margin-top:2px;}
   .hidden{display:none !important;}
   .compare{margin-top:10px;}
@@ -83,7 +83,7 @@
   .bar-row .bar-num{width:44px; flex:none; font-weight:700; color:var(--ink);}
   .conclusion{margin-top:10px; padding:10px 12px; border-radius:10px; background:#ecfdf3; border:1px solid #b9f2cd; font-size:14px; font-weight:700; color:#15803d; display:none;}
   .conclusion.bad{background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;}
-  .actions{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  .actions{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;}
   #toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:#1d2b4f; color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:99; max-width:80vw;}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   details{margin:16px auto 30px; max-width:1080px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
@@ -654,7 +654,7 @@
     tc.translate(120, 0);
     tc.scale(-1, 1);
     tc.drawImage(video, 0, 0, 120, 90);
-    tc.lineWidth = 2;
+    tc.lineWidth = 1.5;
     tc.lineCap = 'round';
     CONNECTIONS.forEach(function(c){
       tc.strokeStyle = '#00c2ff';
@@ -663,10 +663,10 @@
       tc.lineTo(lm[c[1]].x * 120, lm[c[1]].y * 90);
       tc.stroke();
     });
-    tc.fillStyle = '#ff4757';
     lm.forEach(function(p){
       tc.beginPath();
-      tc.arc(p.x * 120, p.y * 90, 2, 0, Math.PI * 2);
+      tc.arc(p.x * 120, p.y * 90, 1.6, 0, Math.PI * 2);
+      tc.fillStyle = '#ffffff';
       tc.fill();
     });
     return t.toDataURL('image/jpeg', 0.75);
@@ -741,7 +741,7 @@
     ctx.save();
     ctx.translate(bw, 0);
     ctx.scale(-1, 1);
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     CONNECTIONS.forEach(function(c){
       ctx.strokeStyle = color;
@@ -750,11 +750,14 @@
       ctx.lineTo(lm[c[1]].x * W * scale + offX, lm[c[1]].y * H * scale + offY);
       ctx.stroke();
     });
-    ctx.fillStyle = color;
     lm.forEach(function(p){
       ctx.beginPath();
-      ctx.arc(p.x * W * scale + offX, p.y * H * scale + offY, 6, 0, Math.PI * 2);
+      ctx.arc(p.x * W * scale + offX, p.y * H * scale + offY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
       ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(13,17,32,0.65)';
+      ctx.stroke();
     });
     ctx.restore();
   }
