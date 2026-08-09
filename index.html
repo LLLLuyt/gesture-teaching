@@ -269,9 +269,39 @@
     var tip = location.protocol === 'file:'
       ? '；反复失败请双击「启动服务器.bat」打开'
       : '；反复失败请检查网络或更换网络后再试';
-    statusText.innerHTML = '加载失败。<a href="#" class="link-inline" id="retryLink">点这里重试</a>' + tip;
+    statusText.innerHTML = '加载失败。<a href="#" class="link-inline" id="retryLink">点这里重试</a>' + tip +
+      '<br><a href="#" class="link-inline" id="diagLink">网络诊断：看看哪些来源可达</a>';
     var a = document.getElementById('retryLink');
     if (a) a.addEventListener('click', function(ev){ ev.preventDefault(); location.reload(); });
+    var d = document.getElementById('diagLink');
+    if (d) d.addEventListener('click', function(ev){ ev.preventDefault(); runDiagnose(); });
+  }
+  function runDiagnose(){
+    var hosts = [
+      { name: '本站模型文件', url: 'mediapipe/hands.js' },
+      { name: '国内镜像', url: 'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240/hands.js' },
+      { name: '国际CDN1', url: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js' },
+      { name: '国际CDN2', url: 'https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js' },
+      { name: '国际CDN3', url: 'https://gcore.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js' },
+      { name: '国际CDN4', url: 'https://unpkg.com/@mediapipe/hands@0.4.1675469240/hands.js' }
+    ];
+    setStatus('网络诊断中（每个来源最多等 8 秒）…', 'info');
+    var results = [];
+    var done = 0;
+    hosts.forEach(function(h){
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 8000);
+      fetch(h.url, { mode: 'no-cors', signal: ctrl ? ctrl.signal : undefined })
+        .then(function(){ return '可达'; })
+        .catch(function(){ return '不可达'; })
+        .then(function(r){
+          clearTimeout(timer);
+          results.push(h.name + '：' + r);
+          if (++done === hosts.length){
+            setStatus('诊断结果：' + results.join('，'), 'error');
+          }
+        });
+    });
   }
   function toast(msg){
     toastEl.textContent = msg;
@@ -691,14 +721,18 @@
   if (!FORCE_CDN) sources.push('mediapipe');
   sources.push('https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240');
   sources.push('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
+  sources.push('https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
+  sources.push('https://gcore.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
   sources.push('https://unpkg.com/@mediapipe/hands@0.4.1675469240');
   var sourceIdx = 0;
   var sourceTimer = null;
   function sourceName(base){
     if (base === 'mediapipe') return '本机文件';
     if (base.indexOf('npmmirror') >= 0) return '国内镜像';
-    if (base.indexOf('jsdelivr') >= 0) return '国际 CDN 1';
-    return '国际 CDN 2';
+    if (base.indexOf('fastly') >= 0) return '国际 CDN 1';
+    if (base.indexOf('gcore') >= 0) return '国际 CDN 2';
+    if (base.indexOf('unpkg') >= 0) return '国际 CDN 3';
+    return '国际 CDN 4';
   }
   function finalFail(msg){
     setStatus(msg, 'error');
@@ -760,7 +794,7 @@
         setStatus('当前来源下载太慢，自动切换下一个来源…');
         setTimeout(tryInitSource, 300);
       }
-    }, base === 'mediapipe' ? 10000 : 20000);
+    }, base === 'mediapipe' ? 8000 : 12000);
     hands.initialize().then(function(){
       if (token !== sourceToken) return;
       clearTimeout(sourceTimer);
