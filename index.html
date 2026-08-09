@@ -198,7 +198,7 @@
     <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，处理分辨率降低（480×360），画面更流畅；不影响识别算法和已采集的数据，切换瞬间完成。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
-    <li>自动检验：采集完成后点「开始检验」，先 3 秒倒计时；每题记录后有 3 秒「下一题」倒计时，同学趁倒计时换手势。AI 只判定「新出现的手势」：没换手势不判；新手势但认不出来（❓）会记为未识别（不算正确）；手势需稳定 1~2 秒才记一次，达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
+    <li>自动检验：采集完成后点「开始检验」，先 3 秒倒计时；每题记录后有 3 秒「下一题」倒计时，同学趁倒计时换手势。倒计时结束、检测到手后，等 3 秒直接判定当前手势（对/错/认不出来 ❓ 记为未识别不算正确），每题约 6 秒；达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
     <li>让"数据越多越准"真实显现的操作协议：第 1 轮只用一只手采集、同只手检验；第 2 轮两只手都采集（多变换角度），检验时两手交替并按每题提示变换角度/远近/转动手腕——数据少时换手或换角度，AI 会真的认错或认不出来（❓），准确率真实偏低；数据多了覆盖全，就真实变高。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
@@ -328,12 +328,11 @@
   var sending = false;
   var testActive = false;
   var testTarget = '布';
-  var testSame = 0;
-  var testLast = '';
-  var testCandidate = '';
   var testAt = 0;
   var countdownTimer = null;
   var testVar = '';
+  var handSince = 0;
+  var lastSeen = 0;
   var TEST_VARS = ['', '转动手腕', '把手歪一点', '离远一点', '靠近一点', '换一只手'];
   function pickVar(){
     return TEST_VARS[Math.floor(Math.random() * TEST_VARS.length)];
@@ -557,11 +556,9 @@
     startCountdown(3, '检验将在 {n} 秒后开始，请同学做好准备…', function(){
       testActive = true;
       testTarget = '布';
-      testSame = 0;
-      testLast = '';
-      testCandidate = '';
       testAt = 0;
       testVar = pickVar();
+      handSince = 0;
       renderAll();
       toast('开始！请同学做出「布」手势' + (testVar ? '——请' + testVar : ''));
     });
@@ -584,34 +581,20 @@
     renderTestStat();
   }
   function autoTestTick(p){
-    if (!testActive || !p) return;
-    if (p.unknown){
-      if (testLast === '?') return;
-      if (testCandidate === '?'){
-        testSame++;
-      } else {
-        testCandidate = '?';
-        testSame = 1;
-      }
-    } else {
-      if (p.label === testLast){
-        testSame = 0;
-        testCandidate = '';
-        return;
-      }
-      if (p.label !== testCandidate){
-        testCandidate = p.label;
-        testSame = 1;
-        return;
-      }
-      testSame++;
+    if (!testActive) return;
+    var now = Date.now();
+    if (!p){
+      if (handSince && now - lastSeen > 600) handSince = 0;
+      lastSeen = now;
+      return;
     }
-    if (testSame < 6) return;
-    if (Date.now() - testAt < 2000) return;
-    testAt = Date.now();
-    testLast = p.unknown ? '?' : p.label;
-    testSame = 0;
-    testCandidate = '';
+    if (!handSince) handSince = now;
+    lastSeen = now;
+    if (now - handSince < 3000) return;
+    handSince = 0;
+    recordTest(p);
+  }
+  function recordTest(p){
     var ok = !p.unknown && p.label === testTarget;
     state.byLabel[testTarget].total++;
     if (ok) state.byLabel[testTarget].correct++;
@@ -637,6 +620,7 @@
     testActive = false;
     startCountdown(3, '下一题「' + testTarget + '」将在 {n} 秒后开始' + (testVar ? '（请' + testVar + '）' : '') + '…', function(){
       testActive = true;
+      handSince = 0;
       renderAll();
       toast('请同学做出「' + testTarget + '」' + (testVar ? '——请' + testVar : ''));
     });
