@@ -654,10 +654,10 @@
     tc.translate(120, 0);
     tc.scale(-1, 1);
     tc.drawImage(video, 0, 0, 120, 90);
-    tc.lineWidth = 1.5;
+    tc.lineWidth = 1.2;
     tc.lineCap = 'round';
     CONNECTIONS.forEach(function(c){
-      tc.strokeStyle = '#00c2ff';
+      tc.strokeStyle = '#00b4ff';
       tc.beginPath();
       tc.moveTo(lm[c[0]].x * 120, lm[c[0]].y * 90);
       tc.lineTo(lm[c[1]].x * 120, lm[c[1]].y * 90);
@@ -666,7 +666,7 @@
     lm.forEach(function(p){
       tc.beginPath();
       tc.arc(p.x * 120, p.y * 90, 1.6, 0, Math.PI * 2);
-      tc.fillStyle = '#ffffff';
+      tc.fillStyle = '#ff7eb3';
       tc.fill();
     });
     return t.toDataURL('image/jpeg', 0.75);
@@ -741,10 +741,10 @@
     ctx.save();
     ctx.translate(bw, 0);
     ctx.scale(-1, 1);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     CONNECTIONS.forEach(function(c){
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = '#00b4ff';
       ctx.beginPath();
       ctx.moveTo(lm[c[0]].x * W * scale + offX, lm[c[0]].y * H * scale + offY);
       ctx.lineTo(lm[c[1]].x * W * scale + offX, lm[c[1]].y * H * scale + offY);
@@ -753,10 +753,10 @@
     lm.forEach(function(p){
       ctx.beginPath();
       ctx.arc(p.x * W * scale + offX, p.y * H * scale + offY, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#ff7eb3';
       ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(13,17,32,0.65)';
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(13,17,32,0.55)';
       ctx.stroke();
     });
     ctx.restore();
