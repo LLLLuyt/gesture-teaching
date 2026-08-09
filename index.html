@@ -186,7 +186,7 @@
     <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，处理分辨率降低（480×360），画面更流畅；不影响识别算法和已采集的数据，切换瞬间完成。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
-    <li>自动检验：采集完成后点「开始检验」，页面提示「请做出：布/石头」自动交替，同学跟着做手势，AI 自动识别并记录对错（手势需稳定 1~2 秒才记一次），达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
+    <li>自动检验：采集完成后点「开始检验」，先 3 秒倒计时；每题记录后有 3 秒「下一题」倒计时，同学趁倒计时换手势，AI 自动识别并记录对错（手势需稳定 1~2 秒才记一次），达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
@@ -484,6 +484,21 @@
     var v = parseInt(inTC.value, 10) || 10;
     return Math.min(30, Math.max(4, v));
   }
+  function startCountdown(seconds, label, onDone){
+    if (countdownTimer) return;
+    var n = seconds;
+    testStat.innerHTML = label.replace('{n}', '<b class="tgt">' + n + '</b>');
+    countdownTimer = setInterval(function(){
+      n--;
+      if (n <= 0){
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+        onDone();
+      } else {
+        testStat.innerHTML = label.replace('{n}', '<b class="tgt">' + n + '</b>');
+      }
+    }, 1000);
+  }
   function startAutoTest(){
     if (testActive || countdownTimer) return;
     if (!targetsDone()){
@@ -493,26 +508,17 @@
     }
     btnStartTest.classList.add('hidden');
     btnEndTest.classList.remove('hidden');
-    var n = 3;
-    testStat.innerHTML = '检验将在 <b class="tgt">' + n + '</b> 秒后开始，请同学做好准备…';
     toast('3 秒倒计时后自动开始检验');
-    countdownTimer = setInterval(function(){
-      n--;
-      if (n <= 0){
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-        testActive = true;
-        testTarget = '布';
-        testSame = 0;
-        testLast = '';
-        testAt = 0;
-        awaitChange = false;
-        renderAll();
-        toast('开始！请同学做出「布」手势');
-      } else {
-        testStat.innerHTML = '检验将在 <b class="tgt">' + n + '</b> 秒后开始，请同学做好准备…';
-      }
-    }, 1000);
+    startCountdown(3, '检验将在 {n} 秒后开始，请同学做好准备…', function(){
+      testActive = true;
+      testTarget = '布';
+      testSame = 0;
+      testLast = '';
+      testAt = 0;
+      awaitChange = false;
+      renderAll();
+      toast('开始！请同学做出「布」手势');
+    });
   }
   function endAutoTest(){
     if (countdownTimer){
@@ -561,10 +567,15 @@
     if (testTotal() >= tc()){
       endAutoTest();
       toast('本轮检验完成！共 ' + testTotal() + ' 次，准确率 ' + pct(testCorrect(), testTotal()) + '%');
-    } else {
-      testTarget = testTarget === '布' ? '石头' : '布';
-      toast(ok ? '✓ 识别正确！请接着做出「' + testTarget + '」' : '✗ 识别错了（AI 说「' + p.label + '」）。请做出「' + testTarget + '」');
+      return;
     }
+    testTarget = testTarget === '布' ? '石头' : '布';
+    testActive = false;
+    startCountdown(3, '下一题「' + testTarget + '」将在 {n} 秒后开始…', function(){
+      testActive = true;
+      renderAll();
+      toast(ok ? '✓ 识别正确！请同学做出「' + testTarget + '」' : '✗ 识别错了（AI 说「' + p.label + '」）。请同学做出「' + testTarget + '」');
+    });
   }
   function snapshot(){
     return {
