@@ -437,7 +437,7 @@
     if (!rows.length) return null;
     rows.sort(function(a, b){ return a.d - b.d; });
     if (rows[0].d > UNRECOGNIZED_DIST){
-      return { label: '无法识别', conf: 0, near: rows[0].d, unknown: true };
+      return { label: 'AI还不认识', conf: 0, near: rows[0].d, unknown: true };
     }
     var k = Math.min(3, rows.length);
     var votes = { '布': 0, '石头': 0 };
@@ -552,7 +552,7 @@
     }
     var conf = Math.max(probs[0], probs[1]);
     if (conf < NN_CONF_THR){
-      return { label: '无法识别', conf: conf, near: 1 - conf, unknown: true };
+      return { label: 'AI还不认识', conf: conf, near: 1 - conf, unknown: true };
     }
     return { label: probs[0] >= probs[1] ? '布' : '石头', conf: conf, near: 1 - conf };
   }
@@ -1014,7 +1014,7 @@
         drawSkeleton(handsList[i], color, bw, bh, scale, offX, offY);
         if (totalSamples() > 0){
           var p = predictCurrent(handsList[i]);
-          var labelText = p.unknown ? '无法识别' : p.label + ' ' + Math.round(p.conf * 100) + '%';
+          var labelText = p.unknown ? 'AI还不认识' : p.label + ' ' + Math.round(p.conf * 100) + '%';
           drawHandLabel(handsList[i], labelText, color, bw, bh, scale, offX, offY);
           labels.push('手' + (i + 1) + ' ' + labelText);
         }
