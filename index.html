@@ -302,6 +302,7 @@
   var testLast = '';
   var testAt = 0;
   var awaitChange = false;
+  var countdownTimer = null;
 
   function setStatus(text, kind){
     statusText.textContent = text;
@@ -488,20 +489,42 @@
       toast('请先完成采集（两类都达到目标张数）');
       return;
     }
-    if (testActive) return;
-    testActive = true;
-    testTarget = '布';
-    testSame = 0;
-    testLast = '';
-    testAt = 0;
-    awaitChange = false;
+    if (testActive || countdownTimer) return;
     btnStartTest.classList.add('hidden');
     btnEndTest.classList.remove('hidden');
-    renderTestStat();
-    toast('检验开始：请同学做出「布」手势');
+    var n = 3;
+    testStat.innerHTML = '检验将在 <b class="tgt">' + n + '</b> 秒后开始，请同学做好准备…';
+    toast('3 秒倒计时后自动开始检验');
+    countdownTimer = setInterval(function(){
+      n--;
+      if (n <= 0){
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+        testActive = true;
+        testTarget = '布';
+        testSame = 0;
+        testLast = '';
+        testAt = 0;
+        awaitChange = false;
+        renderAll();
+        toast('开始！请同学做出「布」手势');
+      } else {
+        testStat.innerHTML = '检验将在 <b class="tgt">' + n + '</b> 秒后开始，请同学做好准备…';
+      }
+    }, 1000);
   }
   function endAutoTest(){
-    if (!testActive) return;
+    if (countdownTimer){
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+    if (!testActive){
+      btnStartTest.classList.remove('hidden');
+      btnEndTest.classList.add('hidden');
+      renderTestStat();
+      toast('已取消检验');
+      return;
+    }
     testActive = false;
     btnStartTest.classList.remove('hidden');
     btnEndTest.classList.add('hidden');
@@ -574,6 +597,7 @@
   }
   function resetAll(){
     if (!confirm('确定清空所有数据（包括已采集图片），重新开始吗？')) return;
+    if (countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; }
     testActive = false;
     btnStartTest.classList.remove('hidden');
     btnEndTest.classList.add('hidden');
