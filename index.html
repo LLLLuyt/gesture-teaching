@@ -183,8 +183,8 @@
 
 <script>
   var FORCE_CDN = location.search.indexOf('cdn=1') >= 0;
-  var CDN_BASE = 'mediapipe';
   var FALLBACKS = [
+    'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240',
     'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240',
     'https://unpkg.com/@mediapipe/hands@0.4.1675469240'
   ];
@@ -195,19 +195,19 @@
   function loadCdn(i){
     if (i >= FALLBACKS.length){
       var t = document.getElementById('statusText');
-      if (t) t.textContent = '模型文件加载失败：请检查网络，或双击「启动服务器.bat」';
+      if (t) t.textContent = location.protocol === 'file:'
+        ? '模型文件加载失败：请检查网络，或双击「启动服务器.bat」'
+        : '模型文件加载失败：请检查网络后刷新重试';
       return;
     }
-    CDN_BASE = FALLBACKS[i];
     var s = document.createElement('script');
     s.src = FALLBACKS[i] + '/hands.js';
     s.onerror = function(){ loadCdn(i + 1); };
     document.head.appendChild(s);
   }
-  if (FORCE_CDN){
-    CDN_BASE = FALLBACKS[0];
-    document.write('<script src="' + CDN_BASE + '/hands.js"><\/script>');
-  }
+  var __scriptTimer = setTimeout(function(){
+    if (!window.Hands && !FORCE_CDN) loadCdn(0);
+  }, 6000);
 </script>
 <script src="mediapipe/hands.js" onerror="onLocalHandsFail()"></script>
 <script>
@@ -265,20 +265,12 @@
     statusBar.className = 'status' + (kind ? ' ' + kind : '');
   }
   function showRetryHelp(){
-    statusText.innerHTML = '加载失败。<a href="#" class="link-inline" id="retryLink">点这里重试</a>；反复失败请双击「启动服务器.bat」打开';
+    var tip = location.protocol === 'file:'
+      ? '；反复失败请双击「启动服务器.bat」打开'
+      : '；反复失败请检查网络或更换网络后再试';
+    statusText.innerHTML = '加载失败。<a href="#" class="link-inline" id="retryLink">点这里重试</a>' + tip;
     var a = document.getElementById('retryLink');
     if (a) a.addEventListener('click', function(ev){ ev.preventDefault(); location.reload(); });
-  }
-  function autoSwitchCdn(){
-    setStatus('本地模式加载失败，正在自动切换联网模式重试…', 'error');
-    setTimeout(function(){ location.replace('?cdn=1'); }, 1200);
-  }
-  function autoRetryOnce(){
-    try {
-      if (sessionStorage.getItem('loadRetried')) return false;
-      sessionStorage.setItem('loadRetried', '1');
-      return true;
-    } catch(e){ return true; }
   }
   function toast(msg){
     toastEl.textContent = msg;
@@ -685,44 +677,70 @@
   }
   var hands = null;
   var modelReady = false;
-  function initHands(){
-    hands = new Hands({ locateFile: function(file){ return CDN_BASE + '/' + file; } });
+  var sources = [];
+  if (!FORCE_CDN) sources.push('mediapipe');
+  sources.push('https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240');
+  sources.push('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240');
+  sources.push('https://unpkg.com/@mediapipe/hands@0.4.1675469240');
+  var sourceIdx = 0;
+  var sourceTimer = null;
+  function sourceName(base){
+    if (base === 'mediapipe') return '本机文件';
+    if (base.indexOf('npmmirror') >= 0) return '国内镜像';
+    if (base.indexOf('jsdelivr') >= 0) return '国际 CDN 1';
+    return '国际 CDN 2';
+  }
+  function finalFail(msg){
+    setStatus(msg, 'error');
+    showRetryHelp();
+  }
+  function tryInitSource(){
+    if (!window.Hands){
+      setStatus('模型脚本加载失败：请检查网络后刷新重试', 'error');
+      showRetryHelp();
+      return;
+    }
+    if (sourceIdx >= sources.length){
+      finalFail('模型加载失败：所有来源都无法访问。请刷新页面重试，或更换网络后再试');
+      return;
+    }
+    var base = sources[sourceIdx];
+    var n = sourceIdx + 1;
+    var name = sourceName(base);
+    setStatus('正在加载手势模型（来源 ' + n + '/' + sources.length + '：' + name + '，约 10MB，首次加载较慢）…');
+    hands = new Hands({ locateFile: function(file){ return base + '/' + file; } });
     hands.setOptions({ maxNumHands: 4, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
     hands.onResults(onResults);
-    var timer = setTimeout(function(){
-      if (!modelReady){
-        if (!FORCE_CDN && location.protocol === 'file:'){
-          autoSwitchCdn();
-        } else if (autoRetryOnce()){
-          statusText.textContent = '模型加载较慢（文件约 10MB），正在自动重试一次…';
-          setTimeout(function(){ location.reload(); }, 1500);
-        } else {
-          setStatus('模型加载超时：模型文件约 10MB，网络慢时加载会超时。请刷新页面重试（第二次会快很多），或换个网络再试', 'error');
-          showRetryHelp();
-        }
-      } else if (!videoReady){
-        setStatus('模型已就绪，但摄像头没有开启：请点击浏览器地址栏的摄像头图标允许访问，然后重试', 'error');
-        showRetryHelp();
+    sourceTimer = setTimeout(function(){
+      sourceIdx++;
+      if (sourceIdx >= sources.length){
+        finalFail('模型加载失败：所有来源下载都超时。请刷新页面重试，或更换网络后再试');
+      } else {
+        setStatus('当前来源下载太慢，自动切换下一个来源…');
+        setTimeout(tryInitSource, 300);
       }
-    }, 40000);
-    var progressTimer = setTimeout(function(){
-      if (!modelReady) statusText.textContent = '模型较大（约 10MB），首次加载需要一点时间，请耐心等待…';
-    }, 8000);
+    }, base === 'mediapipe' ? 10000 : 20000);
     hands.initialize().then(function(){
+      clearTimeout(sourceTimer);
       modelReady = true;
-      clearTimeout(timer);
-      clearTimeout(progressTimer);
       setStatus('手势模型已就绪，正在开启摄像头…');
       return initCamera();
     }).then(function(){
       setStatus('就绪：请把手放到摄像头前', 'ready');
       requestAnimationFrame(loop);
     }).catch(function(e){
-      clearTimeout(timer);
-      clearTimeout(progressTimer);
-      setStatus('初始化失败：' + (e && e.message ? e.message : e), 'error');
-      if (!FORCE_CDN && location.protocol === 'file:') autoSwitchCdn();
-      else showRetryHelp();
+      clearTimeout(sourceTimer);
+      if (!modelReady){
+        sourceIdx++;
+        if (sourceIdx >= sources.length){
+          finalFail('模型加载失败：' + (e && e.message ? e.message : e));
+        } else {
+          tryInitSource();
+        }
+      } else {
+        setStatus('模型已就绪，但摄像头无法开启：' + (e && e.message ? e.message : e) + '。请允许摄像头权限后点重试', 'error');
+        showRetryHelp();
+      }
     });
   }
   function loop(){
@@ -751,7 +769,7 @@
   var restored = restore();
   renderAll();
   if (restored) toast('已恢复上次的实验数据（检验历史记录不保留）');
-  initHands();
+  tryInitSource();
 })();
 </script>
 </body>
