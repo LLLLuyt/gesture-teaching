@@ -16,11 +16,12 @@
   header{max-width:1080px; margin:0 auto 14px;}
   h1{font-size:22px;}
   .sub{color:var(--sub); font-size:13px; margin-top:4px; line-height:1.7;}
-  main{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:1fr 400px; gap:16px; align-items:start;}
+  main{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:1fr 400px; gap:16px; align-items:stretch;}
   @media(max-width:900px){ main{grid-template-columns:1fr;} }
   .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(31,79,214,.06);}
-  .cam-wrap{position:relative;}
-  video{width:100%; display:block; border-radius:10px; transform:scaleX(-1); background:#0b1020;}
+  .cam-card{display:flex; flex-direction:column;}
+  .cam-wrap{position:relative; flex:1; min-height:0;}
+  video{width:100%; height:100%; object-fit:cover; display:block; border-radius:10px; transform:scaleX(-1); background:#0b1020;}
   canvas{position:absolute; inset:0; width:100%; height:100%; border-radius:10px;}
   .live{display:flex; align-items:baseline; gap:10px; margin-top:10px; font-size:15px; flex-wrap:wrap;}
   #liveLabel{font-size:20px; font-weight:700; color:var(--blue);}
@@ -92,7 +93,7 @@
 </header>
 
 <main>
-  <section class="card">
+  <section class="card cam-card">
     <div class="cam-wrap">
       <video id="video" width="640" height="480" autoplay playsinline></video>
       <canvas id="canvas" width="640" height="480"></canvas>
@@ -597,34 +598,34 @@
     renderGallery(galleryRock, '石头');
   }
 
-  function drawSkeleton(lm, color){
+  function drawSkeleton(lm, color, bw, bh, scale, offX, offY){
     ctx.save();
-    ctx.translate(W, 0);
+    ctx.translate(bw, 0);
     ctx.scale(-1, 1);
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     CONNECTIONS.forEach(function(c){
       ctx.strokeStyle = color;
       ctx.beginPath();
-      ctx.moveTo(lm[c[0]].x * W, lm[c[0]].y * H);
-      ctx.lineTo(lm[c[1]].x * W, lm[c[1]].y * H);
+      ctx.moveTo(bw - (lm[c[0]].x * W * scale + offX), lm[c[0]].y * H * scale + offY);
+      ctx.lineTo(bw - (lm[c[1]].x * W * scale + offX), lm[c[1]].y * H * scale + offY);
       ctx.stroke();
     });
     ctx.fillStyle = color;
     lm.forEach(function(p){
       ctx.beginPath();
-      ctx.arc(p.x * W, p.y * H, 6, 0, Math.PI * 2);
+      ctx.arc(bw - (p.x * W * scale + offX), p.y * H * scale + offY, 6, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.restore();
   }
-  function drawHandLabel(lm, text, color){
+  function drawHandLabel(lm, text, color, bw, bh, scale, offX, offY){
     var y = 1e9, x = 0;
     for (var i = 0; i < 21; i++){
       if (lm[i].y < y){ y = lm[i].y; x = lm[i].x; }
     }
-    var px = (1 - x) * W;
-    var py = Math.max(y * H - 12, 20);
+    var px = bw - (x * W * scale + offX);
+    var py = Math.max(y * H * scale + offY - 12, 20);
     ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
     var w = ctx.measureText(text).width;
     ctx.fillStyle = 'rgba(13, 17, 32, .75)';
@@ -638,15 +639,23 @@
     var handsList = results.multiHandLandmarks || [];
     handCount = handsList.length;
     lastLandmarks = handCount === 1 ? handsList[0] : null;
-    ctx.clearRect(0, 0, W, H);
+    var bw = canvas.clientWidth || W, bh = canvas.clientHeight || H;
+    if (canvas.width !== bw || canvas.height !== bh){
+      canvas.width = bw;
+      canvas.height = bh;
+    }
+    var scale = Math.max(bw / W, bh / H);
+    var offX = (bw - W * scale) / 2;
+    var offY = (bh - H * scale) / 2;
+    ctx.clearRect(0, 0, bw, bh);
     if (handCount > 0){
       var labels = [];
       for (var i = 0; i < handsList.length; i++){
         var color = HAND_COLORS[i % HAND_COLORS.length];
-        drawSkeleton(handsList[i], color);
+        drawSkeleton(handsList[i], color, bw, bh, scale, offX, offY);
         if (totalSamples() > 0){
           var p = predict(extractFeatures(handsList[i]));
-          drawHandLabel(handsList[i], p.label + ' ' + Math.round(p.conf * 100) + '%', color);
+          drawHandLabel(handsList[i], p.label + ' ' + Math.round(p.conf * 100) + '%', color, bw, bh, scale, offX, offY);
           labels.push('手' + (i + 1) + ' ' + p.label + ' ' + Math.round(p.conf * 100) + '%');
         }
       }
