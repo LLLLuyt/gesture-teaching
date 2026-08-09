@@ -66,6 +66,7 @@
   .test-row{display:flex; gap:10px; flex-wrap:wrap;}
   .stat-line{font-size:13px; color:var(--sub); margin-top:10px; line-height:1.7;}
   .stat-line b{color:var(--ink);}
+  .stat-line .tgt{color:var(--blue); font-size:17px;}
   .history{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:22px;}
   .chip{width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff;}
   .chip.ok{background:var(--ok);}
@@ -118,6 +119,8 @@
       <input id="inT1" type="number" min="2" max="20" value="4"> 张
       　第 2 轮每类
       <input id="inT2" type="number" min="4" max="50" value="20"> 张
+      　每轮检验
+      <input id="inTC" type="number" min="4" max="30" value="10"> 次
     </div>
     <div class="mode-row">
       <span>识别模式：</span>
@@ -143,10 +146,10 @@
     <div class="gallery" id="galleryRock"></div>
 
     <div class="divider"></div>
-    <div class="sec-title"><span class="n">2</span>检验识别率（同学摆手势，老师按实际手势点按钮，AI 来猜）</div>
+    <div class="sec-title"><span class="n">2</span>AI 自动检验识别率（AI 自己识别并记录，不用点按钮）</div>
     <div class="test-row">
-      <button class="btn-paper" id="btnTestPaper" disabled>检验「布」</button>
-      <button class="btn-rock" id="btnTestRock" disabled>检验「石头」</button>
+      <button class="btn-act" id="btnStartTest" disabled>开始检验（共 <span id="testCountLabel">10</span> 次）</button>
+      <button class="btn-ghost hidden" id="btnEndTest">提前结束</button>
     </div>
     <div class="stat-line" id="testStat">先完成采集（两类都达到目标张数）才能检验</div>
     <div class="history" id="testHistory"></div>
@@ -183,7 +186,7 @@
     <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，处理分辨率降低（480×360），画面更流畅；不影响识别算法和已采集的数据，切换瞬间完成。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
-    <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
+    <li>自动检验：采集完成后点「开始检验」，页面提示「请做出：布/石头」自动交替，同学跟着做手势，AI 自动识别并记录对错（手势需稳定 1~2 秒才记一次），达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
@@ -242,8 +245,9 @@
   var dotsPaper = $('dotsPaper'), dotsRock = $('dotsRock');
   var galleryPaper = $('galleryPaper'), galleryRock = $('galleryRock');
   var btnCollectPaper = $('btnCollectPaper'), btnCollectRock = $('btnCollectRock');
-  var btnTestPaper = $('btnTestPaper'), btnTestRock = $('btnTestRock');
   var testStat = $('testStat'), testHistory = $('testHistory');
+  var btnStartTest = $('btnStartTest'), btnEndTest = $('btnEndTest'), testCountLabel = $('testCountLabel');
+  var inTC = $('inTC');
   var r1Card = $('r1Card'), r1Samples = $('r1Samples'), r1Acc = $('r1Acc'), r1Conf = $('r1Conf');
   var r2Card = $('r2Card'), r2Samples = $('r2Samples'), r2Acc = $('r2Acc'), r2Conf = $('r2Conf');
   var compareBox = $('compareBox'), bar1 = $('bar1'), bar2 = $('bar2'), num1 = $('num1'), num2 = $('num2');
@@ -292,6 +296,11 @@
   var lastCollectAt = 0;
   var toastTimer = null;
   var sending = false;
+  var testActive = false;
+  var testTarget = '布';
+  var testSame = 0;
+  var testLast = '';
+  var testAt = 0;
 
   function setStatus(text, kind){
     statusText.textContent = text;
@@ -391,15 +400,19 @@
     renderDots(dotsPaper, '布', tg['布']);
     renderDots(dotsRock, '石头', tg['石头']);
     var done = targetsDone();
-    btnTestPaper.disabled = !done;
-    btnTestRock.disabled = !done;
+    btnStartTest.disabled = !done || testActive;
+    testCountLabel.textContent = tc();
     btnNextRound.disabled = state.r2 !== null || !(done && testTotal() > 0);
     trainInfo.textContent = '训练集：布 ' + state.samples['布'].length + ' 张 + 石头 ' + state.samples['石头'].length + ' 张 = ' + totalSamples() + ' 张（每次识别都用全部样本投票）';
   }
   function renderTestStat(){
     var t = testTotal();
+    if (testActive){
+      testStat.innerHTML = '请做出「<b class="tgt">' + testTarget + '</b>」　已检验 <b>' + t + '</b> / ' + tc() + ' 次　正确 <b>' + testCorrect() + '</b>　准确率 <b>' + pct(testCorrect(), t) + '%</b>';
+      return;
+    }
     if (!t){
-      testStat.textContent = '第 ' + state.round + ' 轮：还没有检验记录';
+      testStat.textContent = '第 ' + state.round + ' 轮：还没有检验记录（点「开始检验」，AI 会自动识别并记录）';
       return;
     }
     var b = state.byLabel;
@@ -465,31 +478,58 @@
       toast('已采集「' + label + '」第 ' + n + ' 张（目标 ' + tg + ' 张）');
     }
   }
-  function doTest(label){
-    if (handCount === 0 || !lastLandmarks){
-      toast('没看到手：请把手掌放到摄像头前，等骨架出现');
+  function tc(){
+    var v = parseInt(inTC.value, 10) || 10;
+    return Math.min(30, Math.max(4, v));
+  }
+  function startAutoTest(){
+    if (!targetsDone()){
+      toast('请先完成采集（两类都达到目标张数）');
       return;
     }
-    if (handCount > 1){
-      toast('同框有 ' + handCount + ' 只手：检验时请一次只伸一只手');
-      return;
+    if (testActive) return;
+    testActive = true;
+    testTarget = '布';
+    testSame = 0;
+    testLast = '';
+    testAt = 0;
+    btnStartTest.classList.add('hidden');
+    btnEndTest.classList.remove('hidden');
+    renderTestStat();
+    toast('检验开始：请同学做出「布」手势');
+  }
+  function endAutoTest(){
+    if (!testActive) return;
+    testActive = false;
+    btnStartTest.classList.remove('hidden');
+    btnEndTest.classList.add('hidden');
+    renderTestStat();
+  }
+  function autoTestTick(p){
+    if (!testActive || !p) return;
+    if (p.label === testLast){
+      testSame++;
+    } else {
+      testSame = 1;
+      testLast = p.label;
     }
-    var p = predict(extractFeatures(lastLandmarks));
-    if (!p){
-      toast('训练集还没有数据，请先采集图片');
-      return;
-    }
-    var ok = p.label === label;
-    state.byLabel[label].total++;
-    if (ok) state.byLabel[label].correct++;
+    if (testSame < 6) return;
+    if (Date.now() - testAt < 2000) return;
+    testAt = Date.now();
+    testSame = 0;
+    var ok = p.label === testTarget;
+    state.byLabel[testTarget].total++;
+    if (ok) state.byLabel[testTarget].correct++;
     state.confSum += p.conf;
     addHistory(ok);
     save();
     renderAll();
-    if (ok){
-      toast('✓ 识别正确！AI 说「' + p.label + '」，置信度 ' + Math.round(p.conf * 100) + '%');
+    if (testTotal() >= tc()){
+      endAutoTest();
+      toast('本轮检验完成！共 ' + testTotal() + ' 次，准确率 ' + pct(testCorrect(), testTotal()) + '%');
     } else {
-      toast('✗ 识别错了：AI 说「' + p.label + '」，实际是「' + label + '」');
+      testTarget = testTarget === '布' ? '石头' : '布';
+      toast(ok ? '✓ 识别正确！请接着做出「' + testTarget + '」' : '✗ 识别错了：AI 说「' + p.label + '」。请做出「' + testTarget + '」');
     }
   }
   function snapshot(){
@@ -524,6 +564,9 @@
   }
   function resetAll(){
     if (!confirm('确定清空所有数据（包括已采集图片），重新开始吗？')) return;
+    testActive = false;
+    btnStartTest.classList.remove('hidden');
+    btnEndTest.classList.add('hidden');
     state.round = 1;
     state.samples = { '布': [], '石头': [] };
     state.byLabel = { '布': { correct: 0, total: 0 }, '石头': { correct: 0, total: 0 } };
@@ -728,6 +771,9 @@
         liveLabel.textContent = '待训练';
         liveConf.textContent = '（先采集图片）';
       }
+      if (handsList.length > 0 && totalSamples() > 0){
+        autoTestTick(predict(extractFeatures(handsList[0])));
+      }
     } else {
       liveLabel.textContent = '未检测到手';
       liveConf.textContent = '';
@@ -898,8 +944,8 @@
 
   btnCollectPaper.addEventListener('click', function(){ doCollect('布'); });
   btnCollectRock.addEventListener('click', function(){ doCollect('石头'); });
-  btnTestPaper.addEventListener('click', function(){ doTest('布'); });
-  btnTestRock.addEventListener('click', function(){ doTest('石头'); });
+  btnStartTest.addEventListener('click', startAutoTest);
+  btnEndTest.addEventListener('click', endAutoTest);
   btnNextRound.addEventListener('click', nextRound);
   btnReset.addEventListener('click', resetAll);
   inT1.addEventListener('change', function(){
@@ -910,6 +956,7 @@
     if (state.round === 2) roundBadge.textContent = '第 2 轮 · 每类 ' + t2() + ' 张';
     renderCounts();
   });
+  inTC.addEventListener('change', function(){ renderCounts(); });
   modeHigh.addEventListener('click', function(){ applyMode(1); });
   modeLite.addEventListener('click', function(){ applyMode(0); });
 
