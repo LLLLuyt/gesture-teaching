@@ -156,7 +156,7 @@
 <details>
   <summary>使用说明与教学建议</summary>
   <ol>
-    <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定）；也可以直接双击 index.html，但那样需要电脑能联网加载模型。</li>
+    <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定，可离线）；也可以直接双击 index.html，加载失败时页面会自动改用联网模式重试。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。</li>
     <li>请一位同学检验：同学先摆好「布」，老师点击「检验布」，AI 猜对打 ✓、猜错打 ✗；「石头」同样操作。检验 8~10 次，准确率更可信。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
@@ -173,7 +173,6 @@
   var FORCE_CDN = location.search.indexOf('cdn=1') >= 0;
   var CDN_BASE = 'mediapipe';
   var FALLBACKS = [
-    'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240',
     'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240',
     'https://unpkg.com/@mediapipe/hands@0.4.1675469240'
   ];
@@ -249,8 +248,14 @@
     statusText.textContent = text;
     statusBar.className = 'status' + (kind ? ' ' + kind : '');
   }
-  function showFileModeHelp(){
-    statusText.innerHTML = '加载失败。<a href="?cdn=1" class="link-inline">点这里改用联网模式</a>，或双击「启动服务器.bat」';
+  function showRetryHelp(){
+    statusText.innerHTML = '加载失败。<a href="#" class="link-inline" id="retryLink">点这里重试</a>；反复失败请双击「启动服务器.bat」打开';
+    var a = document.getElementById('retryLink');
+    if (a) a.addEventListener('click', function(ev){ ev.preventDefault(); location.reload(); });
+  }
+  function autoSwitchCdn(){
+    setStatus('本地模式加载失败，正在自动切换联网模式重试…', 'error');
+    setTimeout(function(){ location.replace('?cdn=1'); }, 1200);
   }
   function toast(msg){
     toastEl.textContent = msg;
@@ -544,26 +549,39 @@
       .then(function(){ videoReady = true; });
   }
   var hands = null;
+  var modelReady = false;
   function initHands(){
     hands = new Hands({ locateFile: function(file){ return CDN_BASE + '/' + file; } });
     hands.setOptions({ maxNumHands: 4, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
     hands.onResults(onResults);
     var timer = setTimeout(function(){
-      if (!videoReady){
-        setStatus('模型加载超时', 'error');
-        if (!FORCE_CDN && location.protocol === 'file:') showFileModeHelp();
+      if (!modelReady){
+        setStatus('模型加载超时（超过 40 秒）', 'error');
+        if (!FORCE_CDN && location.protocol === 'file:') autoSwitchCdn();
+        else showRetryHelp();
+      } else if (!videoReady){
+        setStatus('模型已就绪，但摄像头没有开启：请点击浏览器地址栏的摄像头图标允许访问，然后重试', 'error');
+        showRetryHelp();
       }
-    }, 20000);
+    }, 40000);
+    var progressTimer = setTimeout(function(){
+      if (!modelReady) statusText.textContent = '模型较大（约 10MB），首次加载需要一点时间，请耐心等待…';
+    }, 8000);
     hands.initialize().then(function(){
+      modelReady = true;
       clearTimeout(timer);
+      clearTimeout(progressTimer);
       setStatus('手势模型已就绪，正在开启摄像头…');
       return initCamera();
     }).then(function(){
       setStatus('就绪：请把手放到摄像头前', 'ready');
       requestAnimationFrame(loop);
     }).catch(function(e){
+      clearTimeout(timer);
+      clearTimeout(progressTimer);
       setStatus('初始化失败：' + (e && e.message ? e.message : e), 'error');
-      if (!FORCE_CDN && location.protocol === 'file:') showFileModeHelp();
+      if (!FORCE_CDN && location.protocol === 'file:') autoSwitchCdn();
+      else showRetryHelp();
     });
   }
   function loop(){
