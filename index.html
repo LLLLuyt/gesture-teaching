@@ -402,7 +402,7 @@
     renderDots(dotsPaper, '布', tg['布']);
     renderDots(dotsRock, '石头', tg['石头']);
     var done = targetsDone();
-    btnStartTest.disabled = !done || testActive;
+    btnStartTest.disabled = testActive;
     testCountLabel.textContent = tc();
     btnNextRound.disabled = state.r2 !== null || !(done && testTotal() > 0);
     trainInfo.textContent = '训练集：布 ' + state.samples['布'].length + ' 张 + 石头 ' + state.samples['石头'].length + ' 张 = ' + totalSamples() + ' 张（每次识别都用全部样本投票）';
@@ -485,11 +485,12 @@
     return Math.min(30, Math.max(4, v));
   }
   function startAutoTest(){
+    if (testActive || countdownTimer) return;
     if (!targetsDone()){
-      toast('请先完成采集（两类都达到目标张数）');
+      var tg = targets();
+      toast('采集还没完成：第 ' + state.round + ' 轮每类需采满 ' + tg['布'] + ' 张（当前布 ' + state.samples['布'].length + ' 张、石头 ' + state.samples['石头'].length + ' 张），可先采集或在上方调小目标张数');
       return;
     }
-    if (testActive || countdownTimer) return;
     btnStartTest.classList.add('hidden');
     btnEndTest.classList.remove('hidden');
     var n = 3;
