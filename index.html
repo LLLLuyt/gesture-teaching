@@ -637,14 +637,14 @@
     CONNECTIONS.forEach(function(c){
       ctx.strokeStyle = color;
       ctx.beginPath();
-      ctx.moveTo(bw - (lm[c[0]].x * W * scale + offX), lm[c[0]].y * H * scale + offY);
-      ctx.lineTo(bw - (lm[c[1]].x * W * scale + offX), lm[c[1]].y * H * scale + offY);
+      ctx.moveTo(lm[c[0]].x * W * scale + offX, lm[c[0]].y * H * scale + offY);
+      ctx.lineTo(lm[c[1]].x * W * scale + offX, lm[c[1]].y * H * scale + offY);
       ctx.stroke();
     });
     ctx.fillStyle = color;
     lm.forEach(function(p){
       ctx.beginPath();
-      ctx.arc(bw - (p.x * W * scale + offX), p.y * H * scale + offY, 6, 0, Math.PI * 2);
+      ctx.arc(p.x * W * scale + offX, p.y * H * scale + offY, 6, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.restore();
