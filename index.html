@@ -73,6 +73,7 @@
   .chip{width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff;}
   .chip.ok{background:var(--ok);}
   .chip.bad{background:var(--bad);}
+  .chip.unk{background:var(--amber);}
   .round-card{border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-top:6px; font-size:13px; color:var(--sub); background:#f8fbff;}
   .round-card .acc{color:var(--blue); font-size:18px; font-weight:800; margin-top:2px;}
   .round-card .extra{font-size:12px; margin-top:2px;}
@@ -195,7 +196,7 @@
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
-    <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大、同一个人检验时，第 1 轮准确率也可能很高；要让"数据越多越准"真实显现，检验时让同学变换角度/远近/转动手腕做手势——AI 的手型特征对角度敏感，第一轮只见过少量姿势、换个姿势就会认错；第二轮姿势覆盖广了就稳了。这就是"婴儿学走路"：数据少时只会走一种姿势，数据多了才走得稳。配合「平均匹配距离」指标观察更明显。</li>
+    <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大、同一个人检验时，第 1 轮准确率也可能很高；要让"数据越多越准"真实显现，检验时让同学变换角度/远近/转动手腕做手势——AI 对手型角度敏感，第一轮只见过少量姿势，换个姿势它就"认不出来"（显示 ❓，不猜）；第二轮姿势覆盖广了就都认得了。这就是"婴儿学走路"：数据少时不是走错，是根本不会走。配合「平均匹配距离」指标观察更明显。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
     <li>课前 30 分钟检查清单（防止上课出意外）：① 所有设备打开一次页面并允许摄像头，确认状态栏显示"就绪"；② 每台设备摆个「布」手势，确认骨架贴手；③ 老师演示机用「启动服务器.bat」离线打开，不依赖网络；④ 正式上课前不要再改代码、不要再刷新已备好的页面。</li>
   </ol>
@@ -236,6 +237,7 @@
 (function(){
   'use strict';
   var LABELS = ['布', '石头'];
+  var UNRECOGNIZED_DIST = 0.9;
   var W = 640, H = 480;
   var CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
   var HAND_COLORS = ['#00c2ff', '#22c55e', '#f59e0b', '#a855f7'];
@@ -382,6 +384,9 @@
     });
     if (!rows.length) return null;
     rows.sort(function(a, b){ return a.d - b.d; });
+    if (rows[0].d > UNRECOGNIZED_DIST){
+      return { label: '无法识别', conf: 0, near: rows[0].d, unknown: true };
+    }
     var k = Math.min(3, rows.length);
     var votes = { '布': 0, '石头': 0 };
     for (var i = 0; i < k; i++) votes[rows[i].label]++;
@@ -425,10 +430,14 @@
     var b = state.byLabel;
     testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + testCorrect() + '</b> 次，准确率 <b>' + pct(testCorrect(), t) + '%</b>（平均匹配距离 <b>' + (state.distSum / t).toFixed(2) + '</b>）· 布 <b>' + b['布'].correct + '/' + b['布'].total + '</b> · 石头 <b>' + b['石头'].correct + '/' + b['石头'].total + '</b>';
   }
-  function addHistory(ok){
+  function addHistory(mark){
     var c = document.createElement('span');
-    c.className = 'chip ' + (ok ? 'ok' : 'bad');
-    c.textContent = ok ? '✓' : '✗';
+    if (mark === '?'){
+      c.className = 'chip unk';
+    } else {
+      c.className = 'chip ' + (mark === '✓' ? 'ok' : 'bad');
+    }
+    c.textContent = mark;
     testHistory.appendChild(c);
     while (testHistory.children.length > 24) testHistory.removeChild(testHistory.firstChild);
   }
@@ -561,10 +570,16 @@
     if (ok) state.byLabel[testTarget].correct++;
     state.confSum += p.conf;
     state.distSum += p.near;
-    addHistory(ok);
+    addHistory(p.unknown ? '?' : (ok ? '✓' : '✗'));
     save();
     renderAll();
-    toast(ok ? '✓ 识别正确（' + p.label + '）' : '✗ 识别错了：AI 说「' + p.label + '」');
+    if (p.unknown){
+      toast('❓ 认不出来：这个手势离见过的照片太远（距离 ' + p.near.toFixed(2) + '），记为未识别');
+    } else if (ok){
+      toast('✓ 识别正确（' + p.label + '）');
+    } else {
+      toast('✗ 识别错了：AI 说「' + p.label + '」');
+    }
     if (testTotal() >= tc()){
       endAutoTest();
       toast('本轮检验完成！共 ' + testTotal() + ' 次，准确率 ' + pct(testCorrect(), testTotal()) + '%');
@@ -814,8 +829,9 @@
         drawSkeleton(handsList[i], color, bw, bh, scale, offX, offY);
         if (totalSamples() > 0){
           var p = predict(extractFeatures(handsList[i]));
-          drawHandLabel(handsList[i], p.label + ' ' + Math.round(p.conf * 100) + '%', color, bw, bh, scale, offX, offY);
-          labels.push('手' + (i + 1) + ' ' + p.label + ' ' + Math.round(p.conf * 100) + '%');
+          var labelText = p.unknown ? '无法识别' : p.label + ' ' + Math.round(p.conf * 100) + '%';
+          drawHandLabel(handsList[i], labelText, color, bw, bh, scale, offX, offY);
+          labels.push('手' + (i + 1) + ' ' + labelText);
         }
       }
       if (labels.length){
