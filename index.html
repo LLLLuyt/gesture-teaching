@@ -37,7 +37,13 @@
   .config{display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; font-size:13px; color:var(--sub); align-items:center;}
   .config input{width:56px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
   .config input[type=range]{width:90px; padding:0; border:none;}
-  .thr-tip{font-size:11px; color:var(--sub);}
+  #trainModal{position:fixed; inset:0; z-index:1000; background:rgba(13,17,32,.55); display:flex; align-items:center; justify-content:center;}
+  .train-box{background:#fff; border-radius:14px; padding:24px 28px; max-width:420px; width:90%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  .train-box h3{font-size:18px; margin-bottom:8px;}
+  .train-box p{font-size:13px; color:var(--sub); margin-bottom:16px;}
+  .train-bar{height:18px; background:#eef2f9; border-radius:999px; overflow:hidden;}
+  .train-bar i{display:block; height:100%; width:0; background:linear-gradient(90deg, var(--cyan), var(--blue)); border-radius:999px; transition:width .15s;}
+  .train-info{font-size:12px; color:var(--sub); margin-top:10px;}
   .mode-row{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; color:var(--sub); flex-wrap:wrap;}
   .mode-btn{font-size:13px; padding:6px 12px; background:#eef2f9; color:var(--sub); font-weight:700;}
   .mode-btn.on{background:var(--blue); color:#fff;}
@@ -127,10 +133,6 @@
       <input id="inT2" type="number" min="4" max="50" value="20"> 张
       　每轮检验
       <input id="inTC" type="number" min="4" max="30" value="10"> 次
-      　认不出来阈值
-      <input id="inThr" type="range" min="0.3" max="2" step="0.05" value="0.9">
-      <span id="thrVal">0.90</span>
-      <span class="thr-tip">越小越严格（越容易 ❓）</span>
     </div>
     <div class="mode-row">
       <span>识别模式：</span>
@@ -198,16 +200,25 @@
     <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，处理分辨率降低（480×360），画面更流畅；不影响识别算法和已采集的数据，切换瞬间完成。</li>
     <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
-    <li>自动检验：采集完成后点「开始检验」，先 3 秒倒计时；每题记录后有 3 秒「下一题」倒计时，同学趁倒计时换手势。倒计时结束、检测到手后，等 3 秒直接判定当前手势（对/错/认不出来 ❓ 记为未识别不算正确），每题约 6 秒；达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
-    <li>让"数据越多越准"真实显现的操作协议：第 1 轮只用一只手采集、同只手检验；第 2 轮两只手都采集（多变换角度），检验时两手交替并按每题提示变换角度/远近/转动手腕——数据少时换手或换角度，AI 会真的认错或认不出来（❓），准确率真实偏低；数据多了覆盖全，就真实变高。</li>
+    <li>自动检验：每次点「开始检验」，程序先用当前全部图片训练一个真实神经网络（弹窗可见训练过程：轮次/损失/准确率），然后 3 秒倒计时开始出题；每题记录后有 3 秒「下一题」倒计时。倒计时结束、检测到手后等 3 秒直接判定（对/错/认不出来 ❓ 记为未识别不算正确），每题约 6 秒；达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
+    <li>让数据作用最明显的操作协议：第 1 轮只用一只手采集；第 2 轮两只手都采集（多变换角度），检验时两手交替并按每题提示变换角度/远近/转动手腕——神经网络对手在画面里的位置、角度、背景很敏感，数据少时换个姿势就认不出来，数据多了覆盖全就稳了。</li>
     <li>记录第 1 轮准确率 → 点击「完成第1轮检验，进入第2轮」→ 给两类各增加图片（默认 20 张）。</li>
     <li>换回刚才那位同学，用同样的方式检验，对比两轮的准确率柱状图。</li>
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
-    <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大、同一个人检验时，第 1 轮准确率也可能很高；要让"数据越多越准"真实显现，检验时让同学变换角度/远近/转动手腕做手势——AI 对手型角度敏感，第一轮只见过少量姿势，换个姿势它就"认不出来"（显示 ❓，记为未识别）；第二轮姿势覆盖广了就都认得了。这就是"婴儿学走路"：数据少时不是走错，是根本不会走。「认不出来阈值」可调：越小越严格（越容易 ❓），越大越宽松；预演时按实际效果微调，配合「平均匹配距离」指标观察更明显。</li>
+    <li>识别率由程序根据真实预测结果计算，不造假。第 1 轮数据少，训练出的神经网络真的学不好——换姿势、换手就认不出来（❓）或认错，准确率真实偏低；第 2 轮数据多，神经网络学到更多特征，准确率真实升高。这就是"婴儿学走路"：数据少时不是走错，是根本不会走。配合「平均置信度」观察更明显（数据越多，AI 越有把握）。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
     <li>课前 30 分钟检查清单（防止上课出意外）：① 所有设备打开一次页面并允许摄像头，确认状态栏显示"就绪"；② 每台设备摆个「布」手势，确认骨架贴手；③ 老师演示机用「启动服务器.bat」离线打开，不依赖网络；④ 正式上课前不要再改代码、不要再刷新已备好的页面。</li>
   </ol>
 </details>
+
+<div id="trainModal" class="hidden">
+  <div class="train-box">
+    <h3>AI 正在学习中…</h3>
+    <p>模型正在分析你采集的图片，找出每种手势的特征</p>
+    <div class="train-bar"><i id="trainFill"></i></div>
+    <div class="train-info" id="trainInfo2">训练轮次 0/0 · 训练准确率 0% · 损失 --</div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -241,9 +252,27 @@
 </script>
 <script src="mediapipe/hands.js" onerror="onLocalHandsFail()"></script>
 <script>
+  var TF_FALLBACKS = [
+    'https://registry.npmmirror.com/@tensorflow/tfjs/4.20.0/files/dist',
+    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist',
+    'https://unpkg.com/@tensorflow/tfjs@4.20.0/dist'
+  ];
+  function loadTF(i){
+    if (typeof tf !== 'undefined') return;
+    if (i >= TF_FALLBACKS.length) return;
+    var s = document.createElement('script');
+    s.src = TF_FALLBACKS[i] + '/tf.min.js';
+    s.onerror = function(){ loadTF(i + 1); };
+    document.head.appendChild(s);
+  }
+  loadTF(0);
+</script>
+<script>
 (function(){
   'use strict';
   var LABELS = ['布', '石头'];
+  var UNRECOGNIZED_DIST = 0.9;
+  var NN_CONF_THR = 0.65;
   var W = 640, H = 480;
   var CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
   var HAND_COLORS = ['#00c2ff', '#22c55e', '#f59e0b', '#a855f7'];
@@ -267,8 +296,8 @@
   var conclusion = $('conclusion');
   var btnNextRound = $('btnNextRound'), btnReset = $('btnReset');
   var inT1 = $('inT1'), inT2 = $('inT2');
-  var inThr = $('inThr'), thrVal = $('thrVal');
   var modeHigh = $('modeHigh'), modeLite = $('modeLite'), modeTip = $('modeTip');
+  var trainModal = $('trainModal'), trainFill = $('trainFill'), trainInfo2 = $('trainInfo2');
   var toastEl = $('toast');
   var MODE_KEY = 'bsst-hand-mode';
   function getMode(){ try { return localStorage.getItem(MODE_KEY) === '0' ? 0 : 1; } catch(e){ return 1; } }
@@ -289,21 +318,6 @@
     }
   }
 
-  var THR_KEY = 'bsst-thr';
-  function initThrUI(){
-    try {
-      var saved = parseFloat(localStorage.getItem(THR_KEY));
-      if (!isNaN(saved) && saved >= 0.3 && saved <= 2){
-        inThr.value = saved;
-      }
-    } catch(e){}
-    thrVal.textContent = getThr().toFixed(2);
-  }
-  function getThr(){
-    var v = parseFloat(inThr.value);
-    if (isNaN(v)) return 0.9;
-    return Math.min(2, Math.max(0.3, v));
-  }
   var SAVE_KEY = 'bushi-shi-tou-v1';
   var state = {
     round: 1,
@@ -411,7 +425,7 @@
     });
     if (!rows.length) return null;
     rows.sort(function(a, b){ return a.d - b.d; });
-    if (rows[0].d > getThr()){
+    if (rows[0].d > UNRECOGNIZED_DIST){
       return { label: '无法识别', conf: 0, near: rows[0].d, unknown: true };
     }
     var k = Math.min(3, rows.length);
@@ -420,6 +434,117 @@
     var label = votes['布'] >= votes['石头'] ? '布' : '石头';
     if (votes['布'] === votes['石头']) label = rows[0].label;
     return { label: label, conf: Math.max(votes['布'], votes['石头']) / k, near: rows[0].d };
+  }
+
+  var nnModel = null;
+  var nnTrainedCount = 0;
+  function tfReady(){ return typeof tf !== 'undefined'; }
+  function extractPixelFeat(lm){
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (var i = 0; i < 21; i++){
+      if (lm[i].x < minX) minX = lm[i].x;
+      if (lm[i].x > maxX) maxX = lm[i].x;
+      if (lm[i].y < minY) minY = lm[i].y;
+      if (lm[i].y > maxY) maxY = lm[i].y;
+    }
+    var padX = (maxX - minX) * 0.4, padY = (maxY - minY) * 0.4;
+    var x0 = Math.max(0, minX - padX), y0 = Math.max(0, minY - padY);
+    var x1 = Math.min(1, maxX + padX), y1 = Math.min(1, maxY + padY);
+    var c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    var cc = c.getContext('2d');
+    cc.drawImage(video, x0 * W, y0 * H, (x1 - x0) * W, (y1 - y0) * H, 0, 0, 64, 64);
+    var d = cc.getImageData(0, 0, 64, 64).data;
+    var out = new Array(64 * 64);
+    for (var p = 0; p < 64 * 64; p++){
+      var i4 = p * 4;
+      out[p] = (d[i4] * 0.299 + d[i4 + 1] * 0.587 + d[i4 + 2] * 0.114) / 127.5 - 1;
+    }
+    return out;
+  }
+  function showTrainModal(){
+    trainModal.classList.remove('hidden');
+    trainFill.style.width = '0%';
+    trainInfo2.textContent = '训练轮次 0/0 · 训练准确率 0% · 损失 --';
+  }
+  function hideTrainModal(){
+    trainModal.classList.add('hidden');
+  }
+  function updateTrainUI(pct, epoch, epochs, logs){
+    trainFill.style.width = pct + '%';
+    trainInfo2.textContent = '训练轮次 ' + epoch + '/' + epochs +
+      ' · 训练准确率 ' + Math.round((logs.acc || 0) * 100) + '%' +
+      ' · 损失 ' + (logs.loss ? logs.loss.toFixed(3) : '--');
+  }
+  function nnNeedsTrain(){
+    if (!tfReady()) return false;
+    var all = totalSamples();
+    if (!nnModel) return all >= 2;
+    if (nnTrainedCount !== all) return all >= 2;
+    return false;
+  }
+  function trainNN(){
+    return new Promise(function(resolve, reject){
+      if (!tfReady()){
+        reject(new Error('TF.js 未加载，使用备用识别'));
+        return;
+      }
+      var xs = [], ys = [];
+      LABELS.forEach(function(label, li){
+        state.samples[label].forEach(function(s){
+          if (!s.px) return;
+          xs.push(s.px);
+          ys.push(li);
+        });
+      });
+      if (xs.length < 2){
+        reject(new Error('训练数据不足'));
+        return;
+      }
+      showTrainModal();
+      var xsT = tf.tensor2d(xs);
+      var ysT = tf.oneHot(tf.tensor1d(ys, 'int32'), 2);
+      var model = tf.sequential();
+      model.add(tf.layers.dense({ inputShape: [64 * 64], units: 32, activation: 'relu', kernelInitializer: 'varianceScaling' }));
+      model.add(tf.layers.dense({ units: 2, activation: 'softmax' }));
+      model.compile({ optimizer: tf.train.adam(0.001), loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
+      var epochs = Math.max(20, Math.min(60, Math.floor(xs.length * 1.5)));
+      model.fit(xsT, ysT, {
+        epochs: epochs,
+        shuffle: true,
+        callbacks: {
+          onEpochEnd: function(epoch, logs){
+            updateTrainUI(Math.round(((epoch + 1) / epochs) * 100), epoch + 1, epochs, logs);
+          }
+        }
+      }).then(function(){
+        if (nnModel){ try { nnModel.dispose(); } catch(e){} }
+        nnModel = model;
+        nnTrainedCount = totalSamples();
+        xsT.dispose();
+        ysT.dispose();
+        hideTrainModal();
+        resolve();
+      }).catch(function(e){
+        hideTrainModal();
+        reject(e);
+      });
+    });
+  }
+  function predictNN(px){
+    if (!nnModel) return null;
+    var t = tf.tensor2d([px]);
+    var probs;
+    try {
+      probs = nnModel.predict(t).dataSync();
+    } finally {
+      t.dispose();
+    }
+    var conf = Math.max(probs[0], probs[1]);
+    if (conf < NN_CONF_THR){
+      return { label: '无法识别', conf: conf, near: 1 - conf, unknown: true };
+    }
+    return { label: probs[0] >= probs[1] ? '布' : '石头', conf: conf, near: 1 - conf };
   }
 
   function renderDots(el, label, target){
@@ -455,7 +580,7 @@
       return;
     }
     var b = state.byLabel;
-    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + testCorrect() + '</b> 次，准确率 <b>' + pct(testCorrect(), t) + '%</b>（平均匹配距离 <b>' + (state.distSum / t).toFixed(2) + '</b>）· 布 <b>' + b['布'].correct + '/' + b['布'].total + '</b> · 石头 <b>' + b['石头'].correct + '/' + b['石头'].total + '</b>';
+    testStat.innerHTML = '第 ' + state.round + ' 轮：已检验 <b>' + t + '</b> 次，正确 <b>' + testCorrect() + '</b> 次，准确率 <b>' + pct(testCorrect(), t) + '%</b>（平均置信度 <b>' + Math.round(state.confSum / t * 100) + '%</b>）· 布 <b>' + b['布'].correct + '/' + b['布'].total + '</b> · 石头 <b>' + b['石头'].correct + '/' + b['石头'].total + '</b>';
   }
   function addHistory(mark){
     var c = document.createElement('span');
@@ -471,7 +596,7 @@
   function renderRoundCard(elS, elA, elC, d){
     elS.textContent = d.samples;
     elA.textContent = pct(d.correct, d.total) + '%';
-    elC.textContent = '平均匹配距离 ' + (typeof d.distAvg === 'number' ? d.distAvg.toFixed(2) : '—') + ' · 布 ' + d.byLabel['布'].correct + '/' + d.byLabel['布'].total + ' · 石头 ' + d.byLabel['石头'].correct + '/' + d.byLabel['石头'].total;
+    elC.textContent = '平均置信度 ' + Math.round((d.confAvg || 0) * 100) + '% · 布 ' + d.byLabel['布'].correct + '/' + d.byLabel['布'].total + ' · 石头 ' + d.byLabel['石头'].correct + '/' + d.byLabel['石头'].total;
   }
   function renderCompare(){
     compareBox.hidden = false;
@@ -481,9 +606,9 @@
     bar2.style.width = a2 + '%';
     num1.textContent = a1 + '%';
     num2.textContent = a2 + '%';
-    var d1 = typeof state.r1.distAvg === 'number' ? state.r1.distAvg.toFixed(2) : '—';
-    var d2 = typeof state.r2.distAvg === 'number' ? state.r2.distAvg.toFixed(2) : '—';
-    distLine.textContent = '平均匹配距离：第1轮 ' + d1 + ' → 第2轮 ' + d2 + '（越小说明 AI 见过的姿势越接近）';
+    var c1 = Math.round((state.r1.confAvg || 0) * 100);
+    var c2 = Math.round((state.r2.confAvg || 0) * 100);
+    distLine.textContent = '平均置信度：第1轮 ' + c1 + '% → 第2轮 ' + c2 + '%（数据越多，AI 越有把握）';
   }
 
   function doCollect(label){
@@ -511,7 +636,7 @@
         return;
       }
     }
-    state.samples[label].push({ f: feats, img: captureThumb(lastLandmarks) });
+    state.samples[label].push({ f: feats, img: captureThumb(lastLandmarks), px: extractPixelFeat(lastLandmarks) });
     save();
     renderAll();
     var n = state.samples[label].length, tg = targets()[label];
@@ -552,6 +677,20 @@
     }
     btnStartTest.classList.add('hidden');
     btnEndTest.classList.remove('hidden');
+    if (nnNeedsTrain()){
+      trainNN().then(function(){
+        toast('AI 训练完成（真实神经网络）！开始检验');
+        beginTestCountdown();
+      }).catch(function(e){
+        btnStartTest.classList.remove('hidden');
+        btnEndTest.classList.add('hidden');
+        toast(e.message);
+      });
+    } else {
+      beginTestCountdown();
+    }
+  }
+  function beginTestCountdown(){
     toast('3 秒倒计时后自动开始检验');
     startCountdown(3, '检验将在 {n} 秒后开始，请同学做好准备…', function(){
       testActive = true;
@@ -679,13 +818,13 @@
     var data = { v: 1, round: state.round, byLabel: state.byLabel, confSum: state.confSum, distSum: state.distSum, r1: state.r1, r2: state.r2 };
     data.samples = {};
     LABELS.forEach(function(label){
-      data.samples[label] = state.samples[label].map(function(s){ return { f: s.f, img: s.img }; });
+      data.samples[label] = state.samples[label].map(function(s){ return { f: s.f, img: s.img, px: s.px }; });
     });
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch(e){
       LABELS.forEach(function(label){
-        data.samples[label] = state.samples[label].map(function(s){ return { f: s.f }; });
+        data.samples[label] = state.samples[label].map(function(s){ return { f: s.f, px: s.px }; });
       });
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); }
       catch(e2){}
@@ -705,7 +844,7 @@
       state.r2 = d.r2 || null;
       LABELS.forEach(function(label){
         state.samples[label] = (d.samples && d.samples[label]) ? d.samples[label].map(function(s){
-          return { f: s.f, img: s.img || null };
+          return { f: s.f, img: s.img || null, px: s.px || null };
         }) : [];
       });
       return true;
@@ -860,7 +999,7 @@
         var color = HAND_COLORS[i % HAND_COLORS.length];
         drawSkeleton(handsList[i], color, bw, bh, scale, offX, offY);
         if (totalSamples() > 0){
-          var p = predict(extractFeatures(handsList[i]));
+          var p = predictCurrent(handsList[i]);
           var labelText = p.unknown ? '无法识别' : p.label + ' ' + Math.round(p.conf * 100) + '%';
           drawHandLabel(handsList[i], labelText, color, bw, bh, scale, offX, offY);
           labels.push('手' + (i + 1) + ' ' + labelText);
@@ -874,12 +1013,15 @@
         liveConf.textContent = '（先采集图片）';
       }
       if (handsList.length > 0 && totalSamples() > 0){
-        autoTestTick(predict(extractFeatures(handsList[0])));
+        autoTestTick(predictCurrent(handsList[0]));
       }
     } else {
       liveLabel.textContent = '未检测到手';
       liveConf.textContent = '';
     }
+  }
+  function predictCurrent(lm){
+    return (nnModel && tfReady()) ? predictNN(extractPixelFeat(lm)) : predict(extractFeatures(lm));
   }
 
   function restartCamera(){
@@ -1059,18 +1201,12 @@
     renderCounts();
   });
   inTC.addEventListener('change', function(){ renderCounts(); });
-  inThr.addEventListener('input', function(){
-    thrVal.textContent = getThr().toFixed(2);
-    try { localStorage.setItem(THR_KEY, String(getThr())); } catch(e){}
-    toast('认不出来阈值：' + getThr().toFixed(2) + '（越小越严格，越容易 ❓）');
-  });
   modeHigh.addEventListener('click', function(){ applyMode(1); });
   modeLite.addEventListener('click', function(){ applyMode(0); });
 
   var restored = restore();
   renderAll();
   renderModeUI();
-  initThrUI();
   if (restored) toast('已恢复上次的实验数据（检验历史记录不保留）');
   boot();
 })();
