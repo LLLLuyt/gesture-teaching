@@ -88,10 +88,6 @@
   details{margin:16px auto 30px; max-width:1080px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
   summary{cursor:pointer; font-weight:700; font-size:14px;}
   details ol, details ul{padding-left:22px; margin-top:8px; font-size:13px; color:var(--sub); line-height:1.9;}
-  #eggInvert{position:fixed; inset:0; z-index:997; background:#fff; mix-blend-mode:difference; pointer-events:none; opacity:0; transition:opacity .35s;}
-  #eggInvert.show{opacity:1;}
-  #eggPinch{position:fixed; z-index:996; border-radius:50%; background:radial-gradient(circle, #fff 0%, rgba(255,255,255,.92) 55%, rgba(255,255,255,0) 100%); mix-blend-mode:difference; pointer-events:none;}
-  #eggCrack{position:fixed; inset:0; z-index:999; pointer-events:none;}
 </style>
 </head>
 <body>
@@ -193,14 +189,9 @@
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
     <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时可以让学生重点观察「平均置信度」的提升，或把第 1 轮张数改成 2 张，差距会更明显。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
-    <li>隐藏彩蛋：模型就绪后，用手（拇指和食指）在空中做出"捏住"的动作——捏合处颜色反转；手指张开，屏幕撕裂反转；手放下或离开画面自动恢复。这就是用 AI 手势操控屏幕。</li>
     <li>课前 30 分钟检查清单（防止上课出意外）：① 所有设备打开一次页面并允许摄像头，确认状态栏显示"就绪"；② 每台设备摆个「布」手势，确认骨架贴手；③ 老师演示机用「启动服务器.bat」离线打开，不依赖网络；④ 正式上课前不要再改代码、不要再刷新已备好的页面。</li>
   </ol>
 </details>
-
-<div id="eggInvert"></div>
-<div id="eggPinch"></div>
-<canvas id="eggCrack"></canvas>
 
 <div id="toast"></div>
 
@@ -741,21 +732,6 @@
       liveLabel.textContent = '未检测到手';
       liveConf.textContent = '';
     }
-    if (window.__gestureEgg && window.__gestureEgg.update){
-      var gst = null;
-      if (handsList.length > 0){
-        var h0 = handsList[0];
-        var tp = h0[4], idx = h0[8];
-        gst = {
-          x: (1 - (tp.x + idx.x) / 2) * window.innerWidth,
-          y: ((tp.y + idx.y) / 2) * window.innerHeight,
-          dx: (idx.x - tp.x) * window.innerWidth,
-          dy: (idx.y - tp.y) * window.innerHeight,
-          distN: Math.hypot(idx.x - tp.x, idx.y - tp.y)
-        };
-      }
-      window.__gestureEgg.update(gst);
-    }
   }
 
   function restartCamera(){
@@ -924,115 +900,6 @@
   renderModeUI();
   if (restored) toast('已恢复上次的实验数据（检验历史记录不保留）');
   boot();
-})();
-</script>
-<script>
-(function(){
-  'use strict';
-  var invertLayer = document.getElementById('eggInvert');
-  var pinchDiv = document.getElementById('eggPinch');
-  var crackCanvas = document.getElementById('eggCrack');
-  if (!invertLayer || !pinchDiv || !crackCanvas) return;
-  var cctx = crackCanvas.getContext('2d');
-  var crack = null;
-  var noiseSeed = [];
-  var fadeRaf = null;
-  var mode = 'idle';
-  var lastDist = -1;
-
-  function resize(){
-    crackCanvas.width = window.innerWidth;
-    crackCanvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  function crackNoise(i){
-    if (!noiseSeed[i]) noiseSeed[i] = Math.random() * 2 - 1;
-    return noiseSeed[i];
-  }
-  function buildCrack(mx, my, dx, dy){
-    var dist = Math.max(Math.hypot(dx, dy), 10);
-    var px = -dy / dist, py = dx / dist;
-    var len = dist + 120;
-    var c = [];
-    for (var i = 0; i <= 12; i++){
-      var u = (i / 12) * 2 - 1;
-      var nz = crackNoise(i) * 22 * (1 - Math.abs(u) * 0.35);
-      c.push({ x: mx + px * u * len / 2 + py * nz, y: my + py * u * len / 2 - px * nz });
-    }
-    return c;
-  }
-  function drawCrack(c, alpha){
-    cctx.clearRect(0, 0, crackCanvas.width, crackCanvas.height);
-    cctx.save();
-    cctx.globalAlpha = alpha;
-    cctx.lineJoin = 'round';
-    cctx.lineCap = 'round';
-    cctx.strokeStyle = '#fff';
-    cctx.lineWidth = 5;
-    cctx.beginPath();
-    cctx.moveTo(c[0].x, c[0].y);
-    for (var i = 1; i < c.length; i++) cctx.lineTo(c[i].x, c[i].y);
-    cctx.stroke();
-    cctx.strokeStyle = '#0b1020';
-    cctx.lineWidth = 3;
-    cctx.stroke();
-    cctx.restore();
-  }
-  function clearCrack(){
-    cctx.clearRect(0, 0, crackCanvas.width, crackCanvas.height);
-    crack = null;
-  }
-  function fadeOut(){
-    function step(){
-      invertLayer.style.opacity = String(Math.max(0, parseFloat(invertLayer.style.opacity || '1') - 0.15));
-      if (invertLayer.style.opacity === '0'){
-        invertLayer.classList.remove('show');
-        pinchDiv.style.display = 'none';
-        clearCrack();
-        mode = 'idle';
-        fadeRaf = null;
-        return;
-      }
-      if (crack) drawCrack(crack, parseFloat(invertLayer.style.opacity));
-      fadeRaf = requestAnimationFrame(step);
-    }
-    if (!fadeRaf) fadeRaf = requestAnimationFrame(step);
-  }
-  function update(st){
-    if (!st){
-      if (mode !== 'idle') fadeOut();
-      lastDist = -1;
-      return;
-    }
-    if (mode === 'idle' && st.distN < 0.06){
-      mode = 'pinch';
-    } else if (mode === 'pinch'){
-      if (st.distN > 0.10) mode = 'pull';
-    } else if (mode === 'pull'){
-      if (st.distN < 0.06) mode = 'pinch';
-    }
-    if (mode === 'pinch'){
-      var r = 70 + st.distN * 1200;
-      pinchDiv.style.display = 'block';
-      pinchDiv.style.width = (r * 2) + 'px';
-      pinchDiv.style.height = (r * 2) + 'px';
-      pinchDiv.style.left = (st.x - r) + 'px';
-      pinchDiv.style.top = (st.y - r) + 'px';
-      invertLayer.classList.remove('show');
-      invertLayer.style.opacity = '1';
-      clearCrack();
-    } else if (mode === 'pull'){
-      pinchDiv.style.display = 'none';
-      invertLayer.style.opacity = '1';
-      invertLayer.classList.add('show');
-      crack = buildCrack(st.x, st.y, st.dx, st.dy);
-      drawCrack(crack, 1);
-    }
-    lastDist = st.distN;
-  }
-  window.__gestureEgg = { update: update };
 })();
 </script>
 </body>
