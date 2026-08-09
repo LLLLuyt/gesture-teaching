@@ -24,6 +24,13 @@
   .cam-wrap{position:relative; height:72vh; max-height:640px; min-height:380px;}
   video{width:100%; height:100%; object-fit:cover; display:block; border-radius:10px; transform:scaleX(-1); background:#0b1020;}
   canvas{position:absolute; inset:0; width:100%; height:100%; border-radius:10px;}
+  .cap-guide{position:absolute; left:20%; top:38%; width:60%; height:56%; pointer-events:none; z-index:5;}
+  .cap-guide .cg{position:absolute; width:26px; height:26px; border:4px solid #00e5ff;}
+  .cap-guide .cg.tl{top:0; left:0; border-right:none; border-bottom:none; border-radius:8px 0 0 0;}
+  .cap-guide .cg.tr{top:0; right:0; border-left:none; border-bottom:none; border-radius:0 8px 0 0;}
+  .cap-guide .cg.bl{bottom:0; left:0; border-right:none; border-top:none; border-radius:0 0 0 8px;}
+  .cap-guide .cg.br{bottom:0; right:0; border-left:none; border-top:none; border-radius:0 0 8px 0;}
+  .cap-guide .cg-hint{position:absolute; bottom:-34px; left:50%; transform:translateX(-50%); white-space:nowrap; background:rgba(0,229,255,.25); color:#e8fbff; font-size:13px; font-weight:700; padding:3px 14px; border-radius:20px;}
   .live{display:flex; align-items:baseline; gap:10px; margin-top:10px; font-size:15px; flex-wrap:wrap;}
   #liveLabel{font-size:20px; font-weight:700; color:var(--blue);}
   #liveConf{color:var(--sub); font-size:13px;}
@@ -114,6 +121,10 @@
     <div class="cam-wrap">
       <video id="video" width="640" height="480" autoplay playsinline></video>
       <canvas id="canvas" width="640" height="480"></canvas>
+      <div class="cap-guide" id="capGuide">
+        <div class="cg tl"></div><div class="cg tr"></div><div class="cg bl"></div><div class="cg br"></div>
+        <div class="cg-hint">请把手放进框里</div>
+      </div>
     </div>
     <div class="live">
       <span>实时识别：</span>
@@ -198,7 +209,7 @@
     <li>打开方式：双击「启动服务器.bat」会自动打开本页面（推荐，最稳定，可离线）；也可以直接双击 index.html 或通过网页链接打开，加载失败时页面会自动切换国内/国际镜像重试。</li>
     <li>第一次打开需要下载约 10MB 模型，慢网络下可能等待 1 分钟（状态栏会显示已等待秒数），这是正常的；建议上课前先每台设备打开一次预热，之后打开就是秒开。</li>
     <li>「识别模式」：平板或老电脑画面卡顿时，点「轻量（流畅）」切换，处理分辨率降低（480×360），画面更流畅；不影响识别算法和已采集的数据，切换瞬间完成。</li>
-    <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要完整露出，骨架关键点要清晰，可稍微变换手的角度再采集。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
+    <li>第 1 轮：把「布」和「石头」各采集 4 张图片。手要放在画面中的蓝色方框内（框内的位置、角度可以变化——这正是神经网络要学习的差异），骨架关键点要清晰。采集的每张图片会显示在缩略图里，点缩略图可删除这一张。</li>
     <li>数据自动保存在本机浏览器里，刷新或关掉页面都不会丢；换浏览器、清除浏览器数据会丢（用「重新开始」可清除全部数据）。</li>
     <li>自动检验：每次点「开始检验」，程序先用当前全部图片训练一个真实神经网络（弹窗可见训练过程：轮次/损失/准确率），然后 3 秒倒计时开始出题；每题记录后有 3 秒「下一题」倒计时。倒计时结束、检测到手后等 3 秒直接判定（对/错/认不出来 ❓ 记为未识别不算正确），每题约 6 秒；达到设定次数自动结束。每轮检验次数可在页面上方修改（默认 10 次）。</li>
     <li>让数据作用最明显的操作协议：第 1 轮只用一只手采集；第 2 轮两只手都采集（多变换角度），检验时两手交替并按每题提示变换角度/远近/转动手腕——神经网络对手在画面里的位置、角度、背景很敏感，数据少时换个姿势就认不出来，数据多了覆盖全就稳了。</li>
@@ -438,22 +449,14 @@
 
   var nnModel = null;
   var nnTrainedCount = 0;
+  var CAPTURE_BOX = { xPct: 0.20, yPct: 0.38, wPct: 0.60, hPct: 0.56 };
   function tfReady(){ return typeof tf !== 'undefined'; }
-  function extractPixelFeat(lm){
-    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
-    for (var i = 0; i < 21; i++){
-      if (lm[i].x < minX) minX = lm[i].x;
-      if (lm[i].x > maxX) maxX = lm[i].x;
-      if (lm[i].y < minY) minY = lm[i].y;
-      if (lm[i].y > maxY) maxY = lm[i].y;
-    }
-    var padX = (maxX - minX) * 0.4, padY = (maxY - minY) * 0.4;
-    var x0 = Math.max(0, minX - padX), y0 = Math.max(0, minY - padY);
-    var x1 = Math.min(1, maxX + padX), y1 = Math.min(1, maxY + padY);
+  function extractPixelFeat(){
     var c = document.createElement('canvas');
     c.width = 64; c.height = 64;
     var cc = c.getContext('2d');
-    cc.drawImage(video, x0 * W, y0 * H, (x1 - x0) * W, (y1 - y0) * H, 0, 0, 64, 64);
+    cc.drawImage(video, CAPTURE_BOX.xPct * W, CAPTURE_BOX.yPct * H,
+      CAPTURE_BOX.wPct * W, CAPTURE_BOX.hPct * H, 0, 0, 64, 64);
     var d = cc.getImageData(0, 0, 64, 64).data;
     var out = new Array(64 * 64);
     for (var p = 0; p < 64 * 64; p++){
@@ -461,6 +464,13 @@
       out[p] = (d[i4] * 0.299 + d[i4 + 1] * 0.587 + d[i4 + 2] * 0.114) / 127.5 - 1;
     }
     return out;
+  }
+  function handInBox(lm){
+    var cx = 0, cy = 0;
+    for (var i = 0; i < 21; i++){ cx += lm[i].x; cy += lm[i].y; }
+    cx /= 21; cy /= 21;
+    return cx >= CAPTURE_BOX.xPct && cx <= CAPTURE_BOX.xPct + CAPTURE_BOX.wPct &&
+           cy >= CAPTURE_BOX.yPct && cy <= CAPTURE_BOX.yPct + CAPTURE_BOX.hPct;
   }
   function showTrainModal(){
     trainModal.classList.remove('hidden');
@@ -627,6 +637,10 @@
       toast('「' + label + '」已经够多了，每类最多 60 张');
       return;
     }
+    if (!handInBox(lastLandmarks)){
+      toast('请把手放进画面中的蓝色方框里再采集');
+      return;
+    }
     var feats = extractFeatures(lastLandmarks);
     if (state.samples[label].length > 0){
       var minD = 1e9;
@@ -636,7 +650,7 @@
         return;
       }
     }
-    state.samples[label].push({ f: feats, img: captureThumb(lastLandmarks), px: extractPixelFeat(lastLandmarks) });
+    state.samples[label].push({ f: feats, img: captureThumb(lastLandmarks), px: extractPixelFeat() });
     save();
     renderAll();
     var n = state.samples[label].length, tg = targets()[label];
@@ -1021,7 +1035,7 @@
     }
   }
   function predictCurrent(lm){
-    return (nnModel && tfReady()) ? predictNN(extractPixelFeat(lm)) : predict(extractFeatures(lm));
+    return (nnModel && tfReady()) ? predictNN(extractPixelFeat()) : predict(extractFeatures(lm));
   }
 
   function restartCamera(){
