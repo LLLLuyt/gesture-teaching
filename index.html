@@ -84,6 +84,10 @@
   details{margin:16px auto 30px; max-width:1080px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
   summary{cursor:pointer; font-weight:700; font-size:14px;}
   details ol, details ul{padding-left:22px; margin-top:8px; font-size:13px; color:var(--sub); line-height:1.9;}
+  #eggInvert{position:fixed; inset:0; z-index:997; background:#fff; mix-blend-mode:difference; pointer-events:none; opacity:0; transition:opacity .35s;}
+  #eggInvert.show{opacity:1;}
+  #eggPinch{position:fixed; z-index:996; border-radius:50%; background:radial-gradient(circle, #fff 0%, rgba(255,255,255,.92) 55%, rgba(255,255,255,0) 100%); mix-blend-mode:difference; pointer-events:none;}
+  #eggCrack{position:fixed; inset:0; z-index:999; pointer-events:none;}
 </style>
 </head>
 <body>
@@ -177,8 +181,13 @@
     <li>四人同框演示：训练完成后，4 位同学可同时把手伸进画面，每只手用不同颜色显示各自的识别结果。采集和检验时请一次只伸一只手。</li>
     <li>识别率由程序根据真实预测结果计算，不造假。布和石头差别大，第 1 轮准确率也可能很高；这时可以让学生重点观察「平均置信度」的提升，或把第 1 轮张数改成 2 张，差距会更明显。</li>
     <li>建议使用 Chrome 或 Edge 浏览器；第一次打开时请允许摄像头权限。</li>
+    <li>隐藏彩蛋：用两根手指（或两个手指头）捏住屏幕同一点，再向两边拉开——屏幕会撕裂并反转颜色（手机/平板体验最佳，松手自动恢复）。</li>
   </ol>
 </details>
+
+<div id="eggInvert"></div>
+<div id="eggPinch"></div>
+<canvas id="eggCrack"></canvas>
 
 <div id="toast"></div>
 
@@ -838,6 +847,130 @@
   renderAll();
   if (restored) toast('已恢复上次的实验数据（检验历史记录不保留）');
   boot();
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+  var invertLayer = document.getElementById('eggInvert');
+  var pinchDiv = document.getElementById('eggPinch');
+  var crackCanvas = document.getElementById('eggCrack');
+  if (!invertLayer || !pinchDiv || !crackCanvas) return;
+  var cctx = crackCanvas.getContext('2d');
+  var pointers = {};
+  var crack = null;
+  var noiseSeed = [];
+  var fadeRaf = null;
+
+  function resize(){
+    crackCanvas.width = window.innerWidth;
+    crackCanvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function pts(){
+    var arr = [];
+    for (var k in pointers){
+      if (pointers.hasOwnProperty(k)) arr.push(pointers[k]);
+    }
+    return arr;
+  }
+  function crackNoise(i){
+    if (!noiseSeed[i]) noiseSeed[i] = Math.random() * 2 - 1;
+    return noiseSeed[i];
+  }
+  function computeState(list){
+    if (list.length < 2) return { mode: 'idle' };
+    var a = list[0], b = list[1];
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    if (dist < 90) return { mode: 'pinch', mx: mx, my: my, dist: dist };
+    var px = -dy / dist, py = dx / dist;
+    var len = dist + 120;
+    var c = [];
+    for (var i = 0; i <= 12; i++){
+      var u = (i / 12) * 2 - 1;
+      var nz = crackNoise(i) * 22 * (1 - Math.abs(u) * 0.35);
+      c.push({ x: mx + px * u * len / 2 + py * nz, y: my + py * u * len / 2 - px * nz });
+    }
+    return { mode: 'pull', crack: c };
+  }
+  function drawCrack(c, alpha){
+    cctx.clearRect(0, 0, crackCanvas.width, crackCanvas.height);
+    cctx.save();
+    cctx.globalAlpha = alpha;
+    cctx.lineJoin = 'round';
+    cctx.lineCap = 'round';
+    cctx.strokeStyle = '#fff';
+    cctx.lineWidth = 5;
+    cctx.beginPath();
+    cctx.moveTo(c[0].x, c[0].y);
+    for (var i = 1; i < c.length; i++) cctx.lineTo(c[i].x, c[i].y);
+    cctx.stroke();
+    cctx.strokeStyle = '#0b1020';
+    cctx.lineWidth = 3;
+    cctx.stroke();
+    cctx.restore();
+  }
+  function clearCrack(){
+    cctx.clearRect(0, 0, crackCanvas.width, crackCanvas.height);
+    crack = null;
+  }
+  function fadeCrack(){
+    var a = 1;
+    function step(){
+      a -= 0.12;
+      if (a <= 0.02 || !crack){ clearCrack(); return; }
+      drawCrack(crack, a);
+      fadeRaf = requestAnimationFrame(step);
+    }
+    fadeRaf = requestAnimationFrame(step);
+  }
+  function applyState(){
+    var st = computeState(pts());
+    if (st.mode === 'pinch'){
+      var r = 70 + st.dist * 0.6;
+      pinchDiv.style.display = 'block';
+      pinchDiv.style.width = (r * 2) + 'px';
+      pinchDiv.style.height = (r * 2) + 'px';
+      pinchDiv.style.left = (st.mx - r) + 'px';
+      pinchDiv.style.top = (st.my - r) + 'px';
+      invertLayer.classList.remove('show');
+      clearCrack();
+    } else if (st.mode === 'pull'){
+      pinchDiv.style.display = 'none';
+      invertLayer.classList.add('show');
+      crack = st.crack;
+      drawCrack(crack, 1);
+    } else {
+      pinchDiv.style.display = 'none';
+      if (invertLayer.classList.contains('show')){
+        invertLayer.classList.remove('show');
+        if (crack) fadeCrack(); else clearCrack();
+      } else {
+        clearCrack();
+      }
+    }
+  }
+  window.addEventListener('pointerdown', function(e){
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    if (pts().length >= 2) document.documentElement.style.touchAction = 'none';
+    applyState();
+  });
+  window.addEventListener('pointermove', function(e){
+    if (!pointers[e.pointerId]) return;
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    applyState();
+  });
+  function up(e){
+    delete pointers[e.pointerId];
+    if (pts().length < 2) document.documentElement.style.touchAction = '';
+    applyState();
+  }
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
 })();
 </script>
 </body>
