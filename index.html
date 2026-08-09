@@ -207,7 +207,7 @@
 <script>
   var FORCE_CDN = location.search.indexOf('cdn=1') >= 0;
   var FALLBACKS = [
-    'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240',
+    'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240/files',
     'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240',
     'https://unpkg.com/@mediapipe/hands@0.4.1675469240'
   ];
@@ -325,7 +325,7 @@
   function runDiagnose(){
     var hosts = [
       { name: '本站模型文件', url: 'mediapipe/hands.js' },
-      { name: '国内镜像', url: 'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240/hands.js' },
+      { name: '国内镜像', url: 'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240/files/hands.js' },
       { name: '国际CDN1', url: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js' },
       { name: '国际CDN2', url: 'https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js' },
       { name: '国际CDN3', url: 'https://gcore.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js' },
@@ -337,8 +337,8 @@
     hosts.forEach(function(h){
       var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 8000);
-      fetch(h.url, { mode: 'no-cors', signal: ctrl ? ctrl.signal : undefined })
-        .then(function(){ return '可达'; })
+      fetch(h.url, { mode: 'cors', signal: ctrl ? ctrl.signal : undefined })
+        .then(function(r){ return r.ok ? '可达' : '不可达(404)'; })
         .catch(function(){ return '不可达'; })
         .then(function(r){
           clearTimeout(timer);
@@ -771,7 +771,7 @@
     var isLocal = location.protocol === 'file:' ||
                   location.hostname === 'localhost' ||
                   location.hostname === '127.0.0.1';
-    var mirror = 'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240';
+    var mirror = 'https://registry.npmmirror.com/@mediapipe/hands/0.4.1675469240/files';
     var jsd = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
     var fastly = 'https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
     var gcore = 'https://gcore.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240';
